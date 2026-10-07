@@ -1,0 +1,24 @@
+{
+  "name": "Student Project Hub - Rajalakshmi Engineering College",
+  "short_name": "ProjectHub",
+  "description": "Private team formation, rooms, chat, and project workspace for REC students and faculty mentors.",
+  "start_url": "/",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#0f172a",
+  "theme_color": "#4f46e5",
+  "icons": [
+    {
+      "src": "/icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}

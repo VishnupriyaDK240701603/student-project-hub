@@ -1,0 +1,32 @@
+export const APP_LIMITS = {
+  maxAiQueriesPerUserPerDay: 20,
+  maxFileSizeBytes: 10 * 1024 * 1024, // 10 MB
+  maxOpenRequestsPerLead: 3,
+  maxPendingMentorInvitesPerStaff: 10,
+  maxMessagesPerMinute: 30,
+  allowedFileExtensions: [
+    ".pdf",
+    ".doc",
+    ".docx",
+    ".ppt",
+    ".pptx",
+    ".xls",
+    ".xlsx",
+    ".png",
+    ".jpg",
+    ".jpeg",
+    ".txt",
+  ] as const,
+  allowedMimeTypes: [
+    "application/pdf",
+    "application/msword",
+    "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    "application/vnd.ms-powerpoint",
+    "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+    "application/vnd.ms-excel",
+    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    "image/png",
+    "image/jpeg",
+    "text/plain",
+  ] as const,
+};
