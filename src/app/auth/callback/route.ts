@@ -33,30 +33,56 @@ export async function GET(request: Request) {
       },
     );
 
-    const { error } = await supabase.auth.exchangeCodeForSession(code);
+    const { data: sessionData, error } = await supabase.auth.exchangeCodeForSession(code);
 
-    if (!error) {
-      // Check if user needs onboarding
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
+    if (error) {
+      console.error("Supabase exchangeCodeForSession error:", error.message);
+      return NextResponse.redirect(`${origin}/login?error=${encodeURIComponent(error.message)}`);
+    }
 
-      if (user) {
-        const { data: profile } = await supabase
-          .from("profiles")
-          .select("consent_given_at")
-          .eq("id", user.id)
-          .single();
+    if (sessionData?.user) {
+      const user = sessionData.user;
+      const email = user.email || "";
 
-        if (!profile) {
-          return NextResponse.redirect(`${origin}/onboarding`);
-        }
+      // Check if profile exists
+      const { data: existingProfile } = await supabase
+        .from("profiles")
+        .select("id, is_blocked, is_deactivated, consent_given_at")
+        .eq("id", user.id)
+        .maybeSingle();
+
+      if (!existingProfile) {
+        // Auto-create profile for first-time login
+        const emailPrefix = email.split("@")[0] || "User";
+        const parts = emailPrefix.split(".");
+        const displayName = parts.map((p) => p.charAt(0).toUpperCase() + p.slice(1)).join(" ");
+        const isStaff = parts.length === 3;
+        const dept = parts[parts.length - 1]?.toUpperCase() || "CSE";
+        const admYear = !isStaff && parts.length >= 3 && /^\d{2}$/.test(parts[2]) ? 2000 + parseInt(parts[2], 10) : 2022;
+
+        await supabase.from("profiles").upsert({
+          id: user.id,
+          email,
+          display_name: user.user_metadata?.full_name || displayName,
+          kind: isStaff ? "staff" : "student",
+          admission_year: isStaff ? null : admYear,
+          department: dept,
+          gender: "prefer_not_to_say",
+          consent_version: "v1.0",
+        });
+
+        return NextResponse.redirect(`${origin}/onboarding`);
+      }
+
+      if (existingProfile.is_blocked || existingProfile.is_deactivated) {
+        return NextResponse.redirect(`${origin}/blocked`);
       }
 
       return NextResponse.redirect(origin);
     }
   }
 
-  // If there's an error or no code, redirect to login with error
-  return NextResponse.redirect(`${origin}/login?error=auth_failed`);
+  const errorDesc = searchParams.get("error_description") || searchParams.get("error") || "auth_failed";
+  console.warn("Auth callback received error parameter:", errorDesc);
+  return NextResponse.redirect(`${origin}/login?error=${encodeURIComponent(errorDesc)}`);
 }

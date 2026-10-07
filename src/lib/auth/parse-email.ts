@@ -32,8 +32,9 @@ export function parseCollegeEmail(email: string): ParsedCollegeEmail | null {
   const localPart = trimmed.slice(0, atIndex);
   const domain = trimmed.slice(atIndex + 1);
 
-  // Validate domain
-  if (domain !== collegeConfig.domain) return null;
+  // Validate domain (matches primary domain or allowed aliases)
+  const isAllowedDomain = domain === collegeConfig.domain || (collegeConfig.allowedDomains || []).includes(domain);
+  if (!isAllowedDomain) return null;
 
   // Split local part by dots
   const segments = localPart.split(".");

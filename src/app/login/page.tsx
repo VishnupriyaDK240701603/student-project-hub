@@ -1,36 +1,49 @@
 "use client";
 
+import React, { Suspense } from "react";
+import { useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { collegeConfig } from "../../../college.config";
 
-export default function LoginPage() {
+function LoginContent() {
+  const searchParams = useSearchParams();
+  const error = searchParams.get("error");
+
   const handleGoogleSignIn = async () => {
     const supabase = createClient();
     await supabase.auth.signInWithOAuth({
       provider: "google",
       options: {
         redirectTo: `${window.location.origin}/auth/callback`,
-        queryParams: {
-          hd: collegeConfig.domain, // Hint the Google screen to show only college domain
-        },
       },
     });
   };
 
   return (
-    <main className="flex min-h-screen flex-col items-center justify-center p-8 bg-gradient-to-b from-slate-50 to-slate-100 dark:from-slate-950 dark:to-slate-900">
-      <div className="w-full max-w-sm rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-8 shadow-lg text-center">
-        <h1 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-slate-100">
-          Student Project Hub
-        </h1>
-        <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
-          {collegeConfig.name}
-        </p>
+    <main className="flex min-h-screen flex-col items-center justify-center p-8 bg-neutral-950 text-neutral-100">
+      <div className="w-full max-w-sm rounded-2xl border border-neutral-800 bg-neutral-900/80 p-8 shadow-2xl text-center space-y-6">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight text-neutral-100">
+            Student Project Hub
+          </h1>
+          <p className="mt-1 text-sm text-neutral-400">
+            {collegeConfig.name}
+          </p>
+        </div>
 
-        <div className="mt-8">
+        {error && (
+          <div className="rounded-xl bg-danger-500/10 border border-danger-500/30 p-3 text-xs text-danger-400 text-left">
+            <span className="font-semibold block mb-1">Authentication Notice:</span>
+            {error === "auth_failed"
+              ? "Unable to complete Google sign-in. Please ensure your Google account is configured in Google Cloud Console."
+              : decodeURIComponent(error)}
+          </div>
+        )}
+
+        <div>
           <button
             onClick={handleGoogleSignIn}
-            className="w-full inline-flex items-center justify-center gap-3 rounded-lg bg-indigo-600 px-4 py-3 text-sm font-semibold text-white shadow-sm hover:bg-indigo-500 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600 transition-colors"
+            className="w-full inline-flex items-center justify-center gap-3 rounded-xl bg-accent-600 px-4 py-3 text-sm font-semibold text-white shadow-sm hover:bg-accent-500 transition-colors cursor-pointer"
           >
             <svg className="h-5 w-5" viewBox="0 0 24 24" fill="currentColor">
               <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z" />
@@ -42,12 +55,18 @@ export default function LoginPage() {
           </button>
         </div>
 
-        <p className="mt-6 text-xs text-slate-400 dark:text-slate-500">
-          Only <strong>@{collegeConfig.domain}</strong> email addresses are allowed.
-          <br />
-          Non-college accounts will be rejected.
+        <p className="text-xs text-neutral-400">
+          Institutional access for students and faculty.
         </p>
       </div>
     </main>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen bg-neutral-950 flex items-center justify-center text-neutral-400">Loading...</div>}>
+      <LoginContent />
+    </Suspense>
   );
 }

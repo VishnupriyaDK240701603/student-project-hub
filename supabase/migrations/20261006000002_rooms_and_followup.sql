@@ -8,6 +8,10 @@ CREATE INDEX IF NOT EXISTS idx_team_requests_room_id ON team_requests(room_id);
 CREATE INDEX IF NOT EXISTS idx_application_files_delete_after ON application_files(delete_after) WHERE delete_after IS NOT NULL;
 
 -- 2. Enhanced create_room_if_ready function supporting follow-up requests and idempotent room creation
+DROP FUNCTION IF EXISTS create_room_if_ready(UUID);
+DROP FUNCTION IF EXISTS close_request(UUID, UUID);
+DROP FUNCTION IF EXISTS accept_invite(UUID);
+
 CREATE OR REPLACE FUNCTION create_room_if_ready(p_request_id UUID)
 RETURNS UUID AS $$
 DECLARE

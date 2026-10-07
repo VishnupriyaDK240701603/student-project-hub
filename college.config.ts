@@ -1,11 +1,12 @@
 export const collegeConfig = {
   name: "Rajalakshmi Engineering College",
-  domain: "rajlakshmi.edu.in",
+  domain: "rajalakshmi.edu.in",
+  allowedDomains: ["rajalakshmi.edu.in", "rajlakshmi.edu.in"],
   patterns: {
-    // Student: name.initial.year.dept@rajlakshmi.edu.in (4 dot-separated segments before domain)
-    student: /^[a-z0-9]+\.[a-z0-9]+\.\d{2}\.[a-z0-9]+@rajlakshmi\.edu\.in$/i,
-    // Staff: name.initial.dept@rajlakshmi.edu.in (3 dot-separated segments before domain)
-    staff: /^[a-z0-9]+\.[a-z0-9]+\.[a-z0-9]+@rajlakshmi\.edu\.in$/i,
+    // Student: name.initial.year.dept@rajalakshmi.edu.in (4 dot-separated segments before domain)
+    student: /^[a-z0-9]+\.[a-z0-9]+\.\d{2}\.[a-z0-9]+@(rajalakshmi|rajlakshmi)\.edu\.in$/i,
+    // Staff: name.initial.dept@rajalakshmi.edu.in (3 dot-separated segments before domain)
+    staff: /^[a-z0-9]+\.[a-z0-9]+\.[a-z0-9]+@(rajalakshmi|rajlakshmi)\.edu\.in$/i,
   },
   departments: {
     cse: "Computer Science and Engineering",

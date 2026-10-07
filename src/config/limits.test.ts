@@ -4,15 +4,17 @@ import { collegeConfig } from "../../college.config";
 
 describe("College Config & Limits", () => {
   it("has valid college configuration defaults", () => {
-    expect(collegeConfig.domain).toBe("rajlakshmi.edu.in");
+    expect(collegeConfig.domain).toBe("rajalakshmi.edu.in");
     expect(collegeConfig.courseYears).toBe(4);
     expect(collegeConfig.graduationMonthDay).toBe("06-30");
   });
 
   it("validates student email pattern", () => {
-    const validStudent = "john.d.22.cse@rajlakshmi.edu.in";
+    const validStudent = "john.d.22.cse@rajalakshmi.edu.in";
+    const validStudentAlias = "john.d.22.cse@rajlakshmi.edu.in";
     const invalidStudent = "john.d@gmail.com";
     expect(collegeConfig.patterns.student.test(validStudent)).toBe(true);
+    expect(collegeConfig.patterns.student.test(validStudentAlias)).toBe(true);
     expect(collegeConfig.patterns.student.test(invalidStudent)).toBe(false);
   });
 
