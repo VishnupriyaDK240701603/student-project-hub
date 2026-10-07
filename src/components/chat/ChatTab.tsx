@@ -10,6 +10,9 @@ import {
   toggleReactionAction,
   type MessageWithSender,
 } from "@/server/actions/chat";
+import { askRoomAiAction } from "@/server/actions/ai";
+import { PlanCard } from "@/components/ai/PlanCard";
+import type { AiPlanProposal } from "@/lib/ai/plan-schema";
 import { MessageBubble } from "./MessageBubble";
 import { MessageInput } from "./MessageInput";
 import { Skeleton } from "@/components/ui";
@@ -26,6 +29,7 @@ export const ChatTab: React.FC<ChatTabProps> = ({
   roomId,
   currentUserId,
   members,
+  isLead,
 }) => {
   const [messages, setMessages] = useState<MessageWithSender[]>([]);
   const [loading, setLoading] = useState(true);
@@ -33,6 +37,13 @@ export const ChatTab: React.FC<ChatTabProps> = ({
   const [loadingMore, setLoadingMore] = useState(false);
   const [replyTo, setReplyTo] = useState<MessageWithSender | null>(null);
   const [editingMessage, setEditingMessage] = useState<MessageWithSender | null>(null);
+
+  // AI assistant state
+  const [isAiThinking, setIsAiThinking] = useState(false);
+  const [activeAiPlan, setActiveAiPlan] = useState<AiPlanProposal | null>(null);
+
+  const currentMember = members.find((m) => m.user_id === currentUserId);
+  const canEditTasks = isLead || !!currentMember?.can_edit_tasks;
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
@@ -177,7 +188,6 @@ export const ChatTab: React.FC<ChatTabProps> = ({
       if (res.success) {
         setReplyTo(null);
         // Optimistic: the realtime subscription will add the message
-        // But also add it immediately for responsiveness
         if (res.data?.message) {
           const senderMember = activeMembers.find((m) => m.user_id === currentUserId);
           const optimisticMsg: MessageWithSender = {
@@ -191,6 +201,53 @@ export const ChatTab: React.FC<ChatTabProps> = ({
           setMessages((prev) => {
             if (prev.find((m) => m.id === optimisticMsg.id)) return prev;
             return [...prev, optimisticMsg];
+          });
+        }
+
+        // Trigger @ai query if mentioned in message
+        if (content.toLowerCase().includes("@ai")) {
+          setIsAiThinking(true);
+          const queryWithoutTag = content.replace(/@\[ai\]\([^)]+\)|@ai/gi, "").trim();
+
+          askRoomAiAction(roomId, queryWithoutTag || content).then((aiRes) => {
+            setIsAiThinking(false);
+            if (aiRes.success && aiRes.data) {
+              const aiMsg: MessageWithSender = {
+                id: `ai-${Date.now()}`,
+                room_id: roomId,
+                sender_id: "ai-assistant",
+                content: aiRes.data.cleanText,
+                reply_to_id: res.data?.message?.id || null,
+                is_edited: false,
+                is_deleted: false,
+                created_at: new Date().toISOString(),
+                updated_at: new Date().toISOString(),
+                profiles: { display_name: "AI Project Assistant", department: "Assistant" },
+                reactions: [],
+                mentions: [],
+              };
+              setMessages((prev) => [...prev, aiMsg]);
+
+              if (aiRes.data.isPlan && aiRes.data.plan) {
+                setActiveAiPlan(aiRes.data.plan);
+              }
+            } else if (aiRes.error) {
+              const aiErrMsg: MessageWithSender = {
+                id: `ai-err-${Date.now()}`,
+                room_id: roomId,
+                sender_id: "ai-assistant",
+                content: `⚠️ ${aiRes.error}`,
+                reply_to_id: res.data?.message?.id || null,
+                is_edited: false,
+                is_deleted: false,
+                created_at: new Date().toISOString(),
+                updated_at: new Date().toISOString(),
+                profiles: { display_name: "AI Project Assistant", department: "Assistant" },
+                reactions: [],
+                mentions: [],
+              };
+              setMessages((prev) => [...prev, aiErrMsg]);
+            }
           });
         }
       }
@@ -267,7 +324,7 @@ export const ChatTab: React.FC<ChatTabProps> = ({
       {/* Messages area */}
       <div
         ref={scrollContainerRef}
-        className="flex-1 overflow-y-auto p-4 space-y-1"
+        className="flex-1 overflow-y-auto p-4 space-y-2"
       >
         {/* Load more button */}
         {hasMore && (
@@ -292,7 +349,7 @@ export const ChatTab: React.FC<ChatTabProps> = ({
             <div>
               <h3 className="text-sm font-semibold text-foreground">No messages yet</h3>
               <p className="text-xs text-muted-foreground mt-1">
-                Be the first to say something! Use @mentions to tag teammates.
+                Be the first to say something! Use @mentions or type @ai to brainstorm.
               </p>
             </div>
           </div>
@@ -321,6 +378,27 @@ export const ChatTab: React.FC<ChatTabProps> = ({
             />
           );
         })}
+
+        {/* AI Thinking Bubble */}
+        {isAiThinking && (
+          <div className="flex items-center gap-2 p-3 bg-accent/5 border border-accent/20 rounded-xl max-w-xs text-xs text-accent animate-pulse">
+            <span className="w-2 h-2 rounded-full bg-accent animate-bounce" />
+            <span>AI Assistant is analyzing and typing...</span>
+          </div>
+        )}
+
+        {/* Active AI Plan Card Proposal */}
+        {activeAiPlan && (
+          <div className="pt-2 max-w-xl">
+            <PlanCard
+              plan={activeAiPlan}
+              roomId={roomId}
+              canEditTasks={canEditTasks}
+              onDismiss={() => setActiveAiPlan(null)}
+              onConfirmed={() => {}}
+            />
+          </div>
+        )}
 
         <div ref={messagesEndRef} />
       </div>
