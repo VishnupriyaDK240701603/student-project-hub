@@ -1,7 +1,7 @@
 # Security and Institutional Privacy Report
 
 **Student Project Hub**
-**Version**: 1.0
+**Version**: 1.0 (Hardened)
 **Date**: October 2026
 **Target Architecture**: Next.js 15, Supabase PostgreSQL with RLS, Hugging Face AI Integration
 
@@ -16,7 +16,39 @@ Student Project Hub enforces strict defense-in-depth isolation across student ro
 
 ---
 
-## 2. Legal & Regulatory Compliance Checklist (DPDP Act 2023)
+## 2. Security Hardening & Edge Function Authorization Review
+
+All server actions and API handlers enforce explicit authorization before accessing data or invoking database routines:
+
+| Server Action / Endpoint | Authorization Enforcement | Negative Test File |
+| :--- | :--- | :--- |
+| `createReportAction` | `auth.uid()` required + Rate limit (5/day) | `src/server/actions/moderation.test.ts` |
+| `getModerationQueueAction` | `app_roles.role == 'moderator'` required | `src/server/actions/moderation.test.ts` |
+| `blockUserAction` | `app_roles.role == 'moderator'` required | `src/server/actions/moderation.test.ts` |
+| `resolveAppealAction` | `role == 'moderator'` AND `decider_id != blocker_id` | `src/server/actions/moderation.test.ts` |
+| `getOwnerDataAction` | `app_roles.role == 'owner'` required | `src/server/actions/owner.test.ts` |
+| `addModeratorAction` | `app_roles.role == 'owner'` + target `kind == 'staff'` | `src/server/actions/owner.test.ts` |
+| `removeModeratorAction` | `app_roles.role == 'owner'` + `modCount > 2` | `src/server/actions/owner.test.ts` |
+| `createTaskAction` | `is_room_member` AND (`is_lead` OR `can_edit_tasks`) | `src/server/actions/permissions-negative.test.ts` |
+| `createMilestoneAction` | `is_room_member` AND (`is_lead` OR `can_set_deadlines`) | `src/server/actions/permissions-negative.test.ts` |
+| `sendMentorInviteAction` | `is_lead` OR `can_invite_mentors` + `pendingCount < 10` | `src/server/actions/mentors.test.ts` |
+| `handleAiQueryAction` | `is_room_member` + bounded context sanitization | `src/server/actions/ai.test.ts` |
+
+---
+
+## 3. Security Headers Configuration
+
+The application enforces the following HTTP security headers via `next.config.ts`:
+- **Content-Security-Policy (CSP)**: `default-src 'self'; script-src 'self' 'unsafe-eval' 'unsafe-inline'; font-src 'self' https://fonts.gstatic.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; frame-ancestors 'none'; object-src 'none'; base-uri 'self'; form-action 'self';`
+- **Strict-Transport-Security (HSTS)**: `max-age=63072000; includeSubDomains; preload`
+- **X-Content-Type-Options**: `nosniff`
+- **X-Frame-Options**: `DENY`
+- **Referrer-Policy**: `strict-origin-when-cross-origin`
+- **Permissions-Policy**: `camera=(), microphone=(), geolocation=(), payment=()`
+
+---
+
+## 4. Legal & Regulatory Compliance Checklist (DPDP Act 2023)
 
 ### A. Digital Personal Data Protection Act Compliance
 - [x] **Notice & Consent**: Versioned consent (`v1.0`) recorded upon onboarding and before sensitive actions (e.g. attaching resumes). Clear notice published at `/privacy`.
@@ -36,24 +68,9 @@ Student Project Hub enforces strict defense-in-depth isolation across student ro
 
 ---
 
-## 3. Central System Limits Verification
+## 5. Security Scanner Findings & Accepted Risks
 
-| Resource / Action | System Limit | Server Enforcement Location |
-| :--- | :--- | :--- |
-| **@ai Queries** | Max 20 queries / user / day | `src/server/actions/ai.ts`, `ai_usage` table |
-| **File Upload Size** | Max 10 MB (10,485,760 bytes) | `src/lib/storage/upload-validation.ts`, `src/config/limits.ts` |
-| **File Formats** | PDF, DOC, DOCX, PPT, PPTX, XLS, XLSX, PNG, JPG, JPEG, TXT | `src/config/limits.ts`, storage upload validation |
-| **Open Team Requests** | Max 3 active requests per lead | `src/server/actions/requests.ts`, `app_limits` |
-| **Pending Mentor Invites** | Max 10 pending invites per staff member | `src/lib/mentor-validation.ts`, `src/server/actions/mentors.ts` |
-| **Chat Message Rate Limit** | Max 30 messages / minute / user | `src/server/actions/chat.ts`, rate limiter |
-| **Moderation Reports** | Max 5 reports / user / 24 hours | `src/lib/moderation-validation.ts`, `src/server/actions/moderation.ts` |
-| **Justification Response Window** | 24 hours to 168 hours (7 days) | `src/lib/moderation-validation.ts`, `src/server/actions/moderation.ts` |
-| **Active Staff Moderators** | Minimum 2 active moderators | `src/server/actions/owner.ts`, `removeModeratorAction` |
-
----
-
-## 4. Verification & Testing Sign-Off
-
-- **Vitest Test Suite**: 21 test files, 263+ automated test cases passing.
-- **Zero Content in Audit Logs**: Verified by automated assertions in `src/server/actions/moderation.test.ts` and `src/server/actions/owner.test.ts`.
-- **Graduation Time-Travel Validation**: Verified in `src/lib/lifecycle/graduation.test.ts`.
+- **npm audit**: 0 vulnerabilities.
+- **Gitleaks / Secret Scanning**: 0 exposed credentials in git repository.
+- **Accepted Risk - Antivirus Upload Scanning**: In v1, file upload validation strictly inspects size limits (10MB), magic bytes (PDF, JPEG, PNG, Office ZIP containers), and blocks executables/scripts. Real-time antivirus scanning is implemented as a documented interface `MockFileScanner` intended for integration with the college's perimeter ICAP/ClamAV gateway upon deployment.
+- **Human Security Review**: Scheduled with College IT prior to ingesting live student data.
