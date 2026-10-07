@@ -211,3 +211,59 @@ export interface RoomFile {
   created_at: string;
 }
 
+export interface Task {
+  id: string;
+  room_id: string;
+  parent_id: string | null;
+  title: string;
+  description: string | null;
+  status: TaskStatusEnum;
+  due_date: string | null;
+  created_by: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface TaskAssignee {
+  id: string;
+  task_id: string;
+  user_id: string;
+  created_at: string;
+}
+
+export interface TaskComment {
+  id: string;
+  task_id: string;
+  author_id: string;
+  content: string;
+  created_at: string;
+}
+
+export interface TaskAttachment {
+  id: string;
+  task_id: string;
+  file_name: string;
+  storage_path: string;
+  created_at: string;
+}
+
+export interface Milestone {
+  id: string;
+  room_id: string;
+  title: string;
+  due_date: string;
+  is_completed: boolean;
+  created_at: string;
+}
+
+export interface Meeting {
+  id: string;
+  room_id: string;
+  title: string;
+  meeting_link: string;
+  scheduled_at: string;
+  created_by: string;
+  created_at: string;
+}
+
+

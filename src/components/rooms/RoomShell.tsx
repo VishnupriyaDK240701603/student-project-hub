@@ -8,8 +8,10 @@ import { MembersTab } from "./MembersTab";
 import { LeaveRoomModal } from "./LeaveRoomModal";
 import { ChatTab } from "@/components/chat/ChatTab";
 import { FilesTab } from "@/components/chat/FilesTab";
+import { TaskBoardTab, ProgressDashboardTab, MilestonesSection, MeetingsSection } from "@/components/tasks";
 import { leaveRoomAction, type RoomEventWithActor } from "@/server/actions/room-management";
-import type { Room, TeamRequest, RoomMember, Profile, LeadTransfer } from "@/types/database.types";
+import { getMilestonesAction, getMeetingsAction, type MeetingWithCreator } from "@/server/actions/tasks";
+import type { Room, TeamRequest, RoomMember, Profile, LeadTransfer, Milestone } from "@/types/database.types";
 
 export type RoomTab = "members" | "chat" | "tasks" | "files" | "deadlines" | "meetings" | "dashboard";
 
@@ -37,6 +39,9 @@ export const RoomShell: React.FC<RoomShellProps> = ({
   const [activeTab, setActiveTab] = useState<RoomTab>(initialTab);
   const [isLeaveModalOpen, setIsLeaveModalOpen] = useState(false);
 
+  const [milestones, setMilestones] = useState<Milestone[]>([]);
+  const [meetings, setMeetings] = useState<MeetingWithCreator[]>([]);
+
   const title = room.team_requests?.title || "Project Room";
   const isLead = room.lead_id === currentUserId;
   const activeMembers = (room.room_members || []).filter((m) => m.status === "active");
@@ -44,6 +49,23 @@ export const RoomShell: React.FC<RoomShellProps> = ({
 
   const currentMember = (room.room_members || []).find((m) => m.user_id === currentUserId);
   const isMentor = currentMember?.role === "mentor";
+  const canEditTaskBoard = isLead || !!currentMember?.can_edit_tasks;
+  const canSetDeadlines = isLead || !!currentMember?.can_set_deadlines;
+
+  const loadMilestonesAndMeetings = React.useCallback(async () => {
+    const [mRes, meetRes] = await Promise.all([
+      getMilestonesAction(room.id),
+      getMeetingsAction(room.id),
+    ]);
+    if (mRes.success && mRes.data) setMilestones(mRes.data.milestones);
+    if (meetRes.success && meetRes.data) setMeetings(meetRes.data.meetings);
+  }, [room.id]);
+
+  React.useEffect(() => {
+    if (activeTab === "deadlines" || activeTab === "meetings") {
+      loadMilestonesAndMeetings();
+    }
+  }, [activeTab, loadMilestonesAndMeetings]);
 
   const tabs: { id: RoomTab; label: string; badge?: number | string }[] = [
     { id: "members", label: "Members", badge: activeMembers.length },
@@ -143,17 +165,14 @@ export const RoomShell: React.FC<RoomShellProps> = ({
         )}
 
         {activeTab === "tasks" && (
-          <div className="p-12 text-center border rounded-xl bg-card/50 space-y-3">
-            <div className="mx-auto w-12 h-12 rounded-full bg-accent/10 flex items-center justify-center text-accent">
-              <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
-              </svg>
-            </div>
-            <h3 className="text-base font-semibold">Task Board & Milestones</h3>
-            <p className="text-sm text-muted-foreground max-w-md mx-auto">
-              Interactive Kanban board (To do, In progress, Done), subtasks, assignees, and attachments (configured in Prompt 15).
-            </p>
-          </div>
+          <TaskBoardTab
+            roomId={room.id}
+            currentUserId={currentUserId}
+            isLead={isLead}
+            canEditTaskBoard={canEditTaskBoard}
+            canSetDeadlines={canSetDeadlines}
+            members={room.room_members || []}
+          />
         )}
 
         {activeTab === "files" && (
@@ -165,45 +184,31 @@ export const RoomShell: React.FC<RoomShellProps> = ({
         )}
 
         {activeTab === "deadlines" && (
-          <div className="p-12 text-center border rounded-xl bg-card/50 space-y-3">
-            <div className="mx-auto w-12 h-12 rounded-full bg-accent/10 flex items-center justify-center text-accent">
-              <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-              </svg>
-            </div>
-            <h3 className="text-base font-semibold">Deadlines & Deliverables</h3>
-            <p className="text-sm text-muted-foreground max-w-md mx-auto">
-              Track project milestones and review deadlines with countdowns and alerts (configured in Prompt 15).
-            </p>
-          </div>
+          <MilestonesSection
+            roomId={room.id}
+            milestones={milestones}
+            canSetDeadlines={canSetDeadlines}
+            onRefresh={loadMilestonesAndMeetings}
+          />
         )}
 
         {activeTab === "meetings" && (
-          <div className="p-12 text-center border rounded-xl bg-card/50 space-y-3">
-            <div className="mx-auto w-12 h-12 rounded-full bg-accent/10 flex items-center justify-center text-accent">
-              <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
-              </svg>
-            </div>
-            <h3 className="text-base font-semibold">Team Meetings & Video Calls</h3>
-            <p className="text-sm text-muted-foreground max-w-md mx-auto">
-              Schedule team syncs and mentor advisory meetings with meeting links (configured in Prompt 15).
-            </p>
-          </div>
+          <MeetingsSection
+            roomId={room.id}
+            meetings={meetings}
+            currentUserId={currentUserId}
+            isLead={isLead}
+            onRefresh={loadMilestonesAndMeetings}
+          />
         )}
 
         {activeTab === "dashboard" && (
-          <div className="p-12 text-center border rounded-xl bg-card/50 space-y-3">
-            <div className="mx-auto w-12 h-12 rounded-full bg-accent/10 flex items-center justify-center text-accent">
-              <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-              </svg>
-            </div>
-            <h3 className="text-base font-semibold">Project Progress Dashboard</h3>
-            <p className="text-sm text-muted-foreground max-w-md mx-auto">
-              Individual and team completion rates with accessible charts (configured in Prompt 15).
-            </p>
-          </div>
+          <ProgressDashboardTab
+            roomId={room.id}
+            currentUserId={currentUserId}
+            isLead={isLead}
+            members={room.room_members || []}
+          />
         )}
       </div>
 
