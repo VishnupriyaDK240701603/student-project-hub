@@ -103,7 +103,7 @@ export async function middleware(request: NextRequest) {
       }
     }
 
-    if (pathname.startsWith("/moderation")) {
+    if (pathname.startsWith("/moderation") || pathname.startsWith("/staff/moderator-console")) {
       const { data: modRole } = await supabase
         .from("app_roles")
         .select("role")

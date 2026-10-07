@@ -266,4 +266,42 @@ export interface Meeting {
   created_at: string;
 }
 
+export interface Report {
+  id: string;
+  reporter_id: string;
+  target_type: "user" | "request" | "message";
+  target_id: string;
+  reason: string;
+  status: ReportStatusEnum;
+  assigned_moderator_id: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ReportSnapshot {
+  id: string;
+  report_id: string;
+  snapshot_data: Json;
+  created_at: string;
+}
+
+export interface Justification {
+  id: string;
+  report_id: string;
+  accused_id: string;
+  content: string | null;
+  deadline: string;
+  created_at: string;
+}
+
+export interface Appeal {
+  id: string;
+  report_id: string;
+  appellant_id: string;
+  reason: string;
+  status: ReportStatusEnum;
+  created_at: string;
+}
+
+
 
