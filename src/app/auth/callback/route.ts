@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
 import { parseCollegeEmail } from "@/lib/auth/parse-email";
+import { createAdminSupabaseClient } from "@/lib/supabase/server";
 
 /**
  * OAuth callback handler.
@@ -79,43 +80,48 @@ export async function GET(request: Request) {
         return res;
       }
 
-      // Check if profile exists
-      const { data: existingProfile } = await supabase
-        .from("profiles")
-        .select("id, is_blocked, is_deactivated, consent_given_at")
-        .eq("id", user.id)
-        .maybeSingle();
+      // Ensure profile exists using admin client so RLS never fails during callback
+      try {
+        const adminSupabase = createAdminSupabaseClient();
+        const { data: existingProfile } = await adminSupabase
+          .from("profiles")
+          .select("id, is_blocked, is_deactivated, consent_given_at")
+          .eq("id", user.id)
+          .maybeSingle();
 
-      if (!existingProfile) {
-        const kind = parsed?.kind || "student";
-        const admissionYear = parsed?.year ?? (kind === "student" ? 2023 : null);
-        const department = parsed?.department || "CSE";
-        const displayName =
-          user.user_metadata?.full_name ||
-          (parsed
-            ? `${parsed.name.charAt(0).toUpperCase() + parsed.name.slice(1)}${parsed.initial ? " " + parsed.initial.toUpperCase() : ""}`
-            : email.split("@")[0]);
+        if (!existingProfile) {
+          const kind = parsed?.kind || "student";
+          const admissionYear = parsed?.year ?? (kind === "student" ? 2023 : null);
+          const department = parsed?.department || "CSE";
+          const displayName =
+            user.user_metadata?.full_name ||
+            (parsed
+              ? `${parsed.name.charAt(0).toUpperCase() + parsed.name.slice(1)}${parsed.initial ? " " + parsed.initial.toUpperCase() : ""}`
+              : email.split("@")[0]);
 
-        await supabase.from("profiles").upsert({
-          id: user.id,
-          email,
-          display_name: displayName,
-          kind,
-          admission_year: admissionYear,
-          department,
-          gender: "prefer_not_to_say",
-          consent_version: "v1.0",
-        });
+          await adminSupabase.from("profiles").upsert({
+            id: user.id,
+            email,
+            display_name: displayName,
+            kind,
+            admission_year: admissionYear,
+            department,
+            gender: "prefer_not_to_say",
+            consent_version: "v1.0",
+          });
 
-        const res = NextResponse.redirect(`${origin}/onboarding`);
-        cookiesToForward.forEach(({ name, value, options }) => res.cookies.set(name, value, options));
-        return res;
-      }
+          const res = NextResponse.redirect(`${origin}/onboarding`);
+          cookiesToForward.forEach(({ name, value, options }) => res.cookies.set(name, value, options));
+          return res;
+        }
 
-      if (existingProfile.is_blocked || existingProfile.is_deactivated) {
-        const res = NextResponse.redirect(`${origin}/blocked`);
-        cookiesToForward.forEach(({ name, value, options }) => res.cookies.set(name, value, options));
-        return res;
+        if (existingProfile.is_blocked || existingProfile.is_deactivated) {
+          const res = NextResponse.redirect(`${origin}/blocked`);
+          cookiesToForward.forEach(({ name, value, options }) => res.cookies.set(name, value, options));
+          return res;
+        }
+      } catch (profileErr) {
+        console.error("[AUTH] Profile sync error:", profileErr);
       }
 
       const res = NextResponse.redirect(`${origin}${next.startsWith("/") ? next : "/"}`);
