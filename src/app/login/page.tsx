@@ -1,6 +1,6 @@
 "use client";
 
-import React, { Suspense } from "react";
+import React, { Suspense, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
@@ -12,26 +12,18 @@ function LoginContent() {
   const errorCode = searchParams.get("error_code");
   const errorDescription = searchParams.get("error_description");
   const attemptedEmail = searchParams.get("email");
-  const [loading, setLoading] = React.useState(false);
-  const [actionError, setActionError] = React.useState<React.ReactNode | null>(null);
+
+  const [googleLoading, setGoogleLoading] = useState(false);
+  const [emailLoading, setEmailLoading] = useState(false);
+  const [actionError, setActionError] = useState<React.ReactNode | null>(null);
+  const [emailInput, setEmailInput] = useState("");
+  const [otpSent, setOtpSent] = useState(false);
 
   const handleGoogleSignIn = async () => {
     try {
-      const configuredSiteUrl = process.env.NEXT_PUBLIC_SITE_URL?.trim();
-      const canonicalOrigin = configuredSiteUrl
-        ? new URL(configuredSiteUrl).origin
-        : window.location.origin;
-
-      // OAuth state is stored in a same-origin cookie. Start the flow and receive
-      // its callback on the configured canonical host to avoid localhost/127.0.0.1
-      // or preview/production host mismatches.
-      if (window.location.origin !== canonicalOrigin) {
-        window.location.replace(`${canonicalOrigin}/login`);
-        return;
-      }
-
       setActionError(null);
-      setLoading(true);
+      setGoogleLoading(true);
+      const canonicalOrigin = window.location.origin;
       const supabase = createClient();
 
       const { error: signInError } = await supabase.auth.signInWithOAuth({
@@ -43,13 +35,56 @@ function LoginContent() {
 
       if (signInError) {
         console.error("Sign in error:", signInError);
-        setActionError("We couldn’t start Google sign-in. Please try again.");
-        setLoading(false);
+        setActionError(
+          signInError.message ||
+            "Google sign-in could not be completed. Please check your Supabase OAuth settings or use Email Magic Link below.",
+        );
+        setGoogleLoading(false);
       }
-    } catch (err) {
+    } catch (err: unknown) {
       console.error("OAuth exception:", err);
-      setActionError("We couldn’t start Google sign-in. Please try again.");
-      setLoading(false);
+      setActionError("We couldn’t start Google sign-in. Please try email sign-in below.");
+      setGoogleLoading(false);
+    }
+  };
+
+  const handleEmailSignIn = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const cleanEmail = emailInput.trim().toLowerCase();
+    if (!cleanEmail) {
+      setActionError("Please enter your college email address.");
+      return;
+    }
+
+    if (!cleanEmail.endsWith(`@${collegeConfig.domain}`) && !(collegeConfig.allowedDomains || []).some(d => cleanEmail.endsWith(`@${d}`))) {
+      setActionError(`Please use a valid @${collegeConfig.domain} institutional email.`);
+      return;
+    }
+
+    try {
+      setActionError(null);
+      setEmailLoading(true);
+      const canonicalOrigin = window.location.origin;
+      const supabase = createClient();
+
+      const { error: otpError } = await supabase.auth.signInWithOtp({
+        email: cleanEmail,
+        options: {
+          emailRedirectTo: `${canonicalOrigin}/auth/callback`,
+        },
+      });
+
+      setEmailLoading(false);
+      if (otpError) {
+        console.error("Email sign-in error:", otpError);
+        setActionError(otpError.message || "Could not send login link. Please try again.");
+      } else {
+        setOtpSent(true);
+      }
+    } catch (err: unknown) {
+      console.error("Email sign-in exception:", err);
+      setActionError("Unable to send magic link. Please check your connection.");
+      setEmailLoading(false);
     }
   };
 
@@ -89,10 +124,10 @@ function LoginContent() {
       return "Your previous sign-in attempt timed out or was already used. Please click 'Continue with Google' to start a fresh login.";
     }
     if (rawError?.includes("PKCE") || rawError?.includes("code verifier")) {
-      return "Your sign-in session could not be verified. Start again in the same browser tab and use the app’s configured address. In Supabase Auth URL Configuration, make sure the Site URL and allowed redirect URL include this app’s exact address and /auth/callback.";
+      return "Your sign-in session could not be verified. In Supabase Auth URL Configuration, make sure the Site URL and allowed redirect URLs include this app’s exact address and /auth/callback.";
     }
     if (error === "auth_failed") {
-      return "Unable to complete Google sign-in. Please ensure your Google account is configured in Google Cloud Console.";
+      return "Unable to complete Google sign-in. Make sure Google provider is enabled in Supabase Authentication settings or use the Email Login option below.";
     }
     if (!rawError) return null;
     try {
@@ -105,7 +140,7 @@ function LoginContent() {
   const displayError = actionError || getErrorMessage();
 
   return (
-    <main className="relative flex h-dvh items-center justify-center overflow-hidden bg-[#f4f7f5] p-4 text-[#112217] sm:p-8">
+    <main className="relative flex min-h-dvh items-center justify-center overflow-hidden bg-[#f4f7f5] p-4 text-[#112217] sm:p-8">
       <div aria-hidden="true" className="pointer-events-none absolute -left-32 -top-32 h-96 w-96 rounded-full bg-[#d8f3dc]/70 blur-3xl" />
       <div aria-hidden="true" className="pointer-events-none absolute -bottom-40 -right-24 h-[28rem] w-[28rem] rounded-full bg-[#c9e7d2]/60 blur-3xl" />
 
@@ -126,7 +161,7 @@ function LoginContent() {
             </div>
           </div>
 
-          <div className="relative z-10 py-12">
+          <div className="relative z-10 py-8">
             <span className="inline-flex items-center gap-2 rounded-full border border-emerald-200/20 bg-white/5 px-3 py-1.5 text-xs font-semibold text-emerald-100">
               <span className="h-1.5 w-1.5 rounded-full bg-[#74c69d]" />
               Ideas grow better together
@@ -138,7 +173,7 @@ function LoginContent() {
               Meet teammates, shape your ideas, and turn campus projects into something real.
             </p>
 
-            <div className="mt-10 flex items-center gap-3 rounded-2xl border border-white/10 bg-white/[0.06] p-4 backdrop-blur-sm">
+            <div className="mt-8 flex items-center gap-3 rounded-2xl border border-white/10 bg-white/[0.06] p-4 backdrop-blur-sm">
               <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#74c69d]/15 text-[#9ae6b4]">
                 <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden="true">
                   <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2Z" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
@@ -155,7 +190,7 @@ function LoginContent() {
         </section>
 
         <section className="flex items-center justify-center p-6 sm:p-10 lg:p-14" aria-labelledby="login-title">
-          <div className="w-full max-w-sm space-y-8">
+          <div className="w-full max-w-sm space-y-6">
             <div className="md:hidden">
               <p className="text-sm font-bold text-[#143d28]">Student Project Hub</p>
               <p className="mt-1 text-xs text-[#6a8475]">{collegeConfig.name}</p>
@@ -163,11 +198,11 @@ function LoginContent() {
 
             <div>
               <p className="text-sm font-semibold text-[#31754b]">Welcome to your project hub</p>
-              <h1 id="login-title" className="mt-2 text-3xl font-extrabold tracking-tight text-[#112217] sm:text-4xl">
+              <h1 id="login-title" className="mt-2 text-3xl font-extrabold tracking-tight text-[#112217]">
                 Sign in
               </h1>
-              <p className="mt-3 text-sm leading-6 text-[#607568]">
-                Use your institutional Google account to continue.
+              <p className="mt-2 text-sm leading-6 text-[#607568]">
+                Use your institutional account to continue.
               </p>
             </div>
 
@@ -187,32 +222,81 @@ function LoginContent() {
               </div>
             )}
 
-            <div className="space-y-4">
-              <button
-                type="button"
-                onClick={handleGoogleSignIn}
-                disabled={loading}
-                aria-busy={loading}
-                className="group inline-flex min-h-14 w-full items-center justify-center gap-3 rounded-2xl bg-[#143d28] px-5 py-4 text-sm font-bold text-white shadow-[0_12px_24px_-12px_rgba(20,61,40,0.65)] transition duration-200 hover:-translate-y-0.5 hover:bg-[#1e5338] hover:shadow-[0_16px_28px_-12px_rgba(20,61,40,0.7)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#31754b] focus-visible:ring-offset-2 disabled:translate-y-0 disabled:cursor-wait disabled:opacity-70 motion-reduce:transform-none"
-              >
-                {loading ? (
-                  <span className="h-5 w-5 animate-spin rounded-full border-2 border-white/35 border-t-white" aria-hidden="true" />
-                ) : (
-                  <svg className="h-5 w-5" viewBox="0 0 24 24" aria-hidden="true">
-                    <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1Z" />
-                    <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23Z" />
-                    <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18A11 11 0 0 0 1 12c0 1.78.43 3.45 1.18 4.93l3.66-2.84Z" />
-                    <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53Z" />
-                  </svg>
-                )}
-                {loading ? "Connecting to Google…" : "Continue with Google"}
-              </button>
-              <p className="text-center text-xs leading-5 text-[#718579]">
-                Secure institutional access for students and faculty.
-              </p>
-            </div>
+            {otpSent ? (
+              <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-5 text-sm leading-6 text-emerald-900 space-y-3">
+                <div className="flex items-center gap-2 font-bold text-emerald-800">
+                  <span>✉️ Login link sent!</span>
+                </div>
+                <p className="text-xs text-emerald-800">
+                  We sent a magic sign-in link to <strong className="font-mono text-emerald-950">{emailInput}</strong>. Check your inbox to sign in instantly.
+                </p>
+                <button
+                  type="button"
+                  onClick={() => setOtpSent(false)}
+                  className="text-xs font-semibold text-emerald-700 underline hover:text-emerald-900"
+                >
+                  Use a different email or method
+                </button>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {/* Google Sign In Button */}
+                <button
+                  type="button"
+                  onClick={handleGoogleSignIn}
+                  disabled={googleLoading || emailLoading}
+                  aria-busy={googleLoading}
+                  className="group inline-flex min-h-12 w-full items-center justify-center gap-3 rounded-2xl bg-[#143d28] px-5 py-3.5 text-sm font-bold text-white shadow-[0_12px_24px_-12px_rgba(20,61,40,0.65)] transition duration-200 hover:-translate-y-0.5 hover:bg-[#1e5338] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#31754b] disabled:opacity-70 motion-reduce:transform-none"
+                >
+                  {googleLoading ? (
+                    <span className="h-5 w-5 animate-spin rounded-full border-2 border-white/35 border-t-white" aria-hidden="true" />
+                  ) : (
+                    <svg className="h-5 w-5" viewBox="0 0 24 24" aria-hidden="true">
+                      <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1Z" />
+                      <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23Z" />
+                      <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18A11 11 0 0 0 1 12c0 1.78.43 3.45 1.18 4.93l3.66-2.84Z" />
+                      <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53Z" />
+                    </svg>
+                  )}
+                  {googleLoading ? "Connecting to Google…" : "Continue with Google"}
+                </button>
 
-            <div className="border-t border-[#e5ede7] pt-5 text-center">
+                <div className="relative flex items-center justify-center py-2">
+                  <div className="absolute inset-0 flex items-center">
+                    <div className="w-full border-t border-slate-200" />
+                  </div>
+                  <span className="relative bg-white px-3 text-xs font-semibold uppercase tracking-wider text-slate-400">
+                    Or sign in with email
+                  </span>
+                </div>
+
+                {/* Email Sign In Form */}
+                <form onSubmit={handleEmailSignIn} className="space-y-3">
+                  <div>
+                    <label htmlFor="email-input" className="block text-xs font-semibold text-slate-700 mb-1">
+                      College Email Address
+                    </label>
+                    <input
+                      id="email-input"
+                      type="email"
+                      value={emailInput}
+                      onChange={(e) => setEmailInput(e.target.value)}
+                      placeholder={`e.g. student.a.22.cse@${collegeConfig.domain}`}
+                      className="w-full rounded-xl border border-slate-300 bg-slate-50/50 px-3.5 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 outline-none focus:border-emerald-600 focus:bg-white focus:ring-2 focus:ring-emerald-500/20"
+                    />
+                  </div>
+                  <button
+                    type="submit"
+                    disabled={emailLoading || googleLoading}
+                    className="inline-flex min-h-11 w-full items-center justify-center rounded-xl border border-emerald-700 bg-emerald-50 text-emerald-800 px-4 py-2.5 text-sm font-semibold hover:bg-emerald-100 transition-colors disabled:opacity-60"
+                  >
+                    {emailLoading ? "Sending magic link…" : "Send Magic Link to Email"}
+                  </button>
+                </form>
+              </div>
+            )}
+
+            <div className="border-t border-[#e5ede7] pt-4 text-center">
               <Link href="/privacy" className="text-xs font-medium text-[#52715e] underline-offset-4 hover:text-[#143d28] hover:underline">
                 Privacy and access information
               </Link>
