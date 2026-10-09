@@ -19,6 +19,28 @@ function LoginContent() {
   const [emailInput, setEmailInput] = useState("");
   const [otpSent, setOtpSent] = useState(false);
 
+  React.useEffect(() => {
+    const supabase = createClient();
+    
+    // Check if user already has an active session
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session?.user) {
+        window.location.href = "/requests";
+      }
+    });
+
+    // Listen for auth events (e.g. after OAuth popup / hash redirect)
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if ((event === "SIGNED_IN" || event === "USER_UPDATED") && session?.user) {
+        window.location.href = "/requests";
+      }
+    });
+
+    return () => {
+      subscription.unsubscribe();
+    };
+  }, []);
+
   const handleGoogleSignIn = async () => {
     try {
       setActionError(null);
