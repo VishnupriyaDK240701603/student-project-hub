@@ -55,7 +55,7 @@ export const ThemeToggle: React.FC<{ className?: string }> = ({ className = "" }
         </svg>
       ) : (
         // Moon icon for dark mode
-        <svg className="h-5 w-5 text-slate-600 dark:text-slate-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <svg className="h-5 w-5 text-emerald-100" fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path
             strokeLinecap="round"
             strokeLinejoin="round"

@@ -42,11 +42,11 @@ export const LeadSwapModal: React.FC<LeadSwapModalProps> = ({
   return (
     <Dialog isOpen={isOpen} onClose={onClose} title={title}>
       <div className="space-y-4">
-        <div className="rounded-lg bg-indigo-500/10 border border-indigo-500/20 p-3 text-sm text-indigo-900 dark:text-indigo-200">
-          <p className="font-medium">
+        <div className="rounded-xl bg-accent/10 border border-accent/20 p-3.5 text-sm">
+          <p className="font-bold text-foreground">
             {isOffer ? "Safe Leadership Handover" : "Teammate Leadership Request"}
           </p>
-          <p className="mt-1 text-xs text-muted-foreground">
+          <p className="mt-1 text-xs text-muted-foreground leading-relaxed">
             {isOffer
               ? `You are offering full team leadership to ${targetMemberName}. If accepted, room leadership, request ownership, candidate applications, and waitlists will transfer atomically. You will remain an active team member.`
               : "You are requesting to become the project lead. The current lead will review your request. If approved, project ownership and management permissions will transfer to you."}

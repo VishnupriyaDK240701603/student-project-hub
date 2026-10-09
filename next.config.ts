@@ -15,6 +15,12 @@ const cspHeader = `
 
 const nextConfig: NextConfig = {
   reactStrictMode: true,
+  compiler: {
+    removeConsole: process.env.NODE_ENV === "production",
+  },
+  experimental: {
+    optimizePackageImports: ["@supabase/supabase-js", "@supabase/ssr"],
+  },
   async headers() {
     return [
       {
@@ -43,6 +49,15 @@ const nextConfig: NextConfig = {
           {
             key: "Permissions-Policy",
             value: "camera=(), microphone=(), geolocation=(), payment=()",
+          },
+        ],
+      },
+      {
+        source: "/(icons|manifest.json|favicon.ico)(.*)",
+        headers: [
+          {
+            key: "Cache-Control",
+            value: "public, max-age=31536000, immutable",
           },
         ],
       },

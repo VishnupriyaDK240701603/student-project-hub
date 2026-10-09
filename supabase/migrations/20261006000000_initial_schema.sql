@@ -182,9 +182,10 @@ CREATE TABLE mentions (
 CREATE TABLE room_files (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   room_id UUID NOT NULL REFERENCES rooms(id) ON DELETE CASCADE,
-  uploader_id UUID NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
+  uploaded_by UUID NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
   storage_path TEXT NOT NULL,
   file_name TEXT NOT NULL,
+  file_type TEXT NOT NULL,
   file_size_bytes BIGINT NOT NULL CHECK (file_size_bytes <= 10485760),
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );

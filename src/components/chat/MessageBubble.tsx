@@ -63,7 +63,7 @@ function renderContent(content: string, members: (RoomMember & { profiles: Profi
     parts.push(
       <span
         key={`mention-${match.index}`}
-        className="inline-flex items-center gap-0.5 px-1 py-0.5 rounded bg-accent/15 text-accent font-medium text-[0.85em] cursor-default"
+        className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-md bg-emerald-100 text-emerald-900 dark:bg-emerald-950/80 dark:text-emerald-300 font-semibold text-[0.85em] cursor-default"
         title={member?.profiles?.display_name || displayName}
       >
         @{displayName}
@@ -135,11 +135,11 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
     return (
       <div className={`flex gap-2 ${isOwn ? "flex-row-reverse" : ""} py-0.5`}>
         <div
-          className={`max-w-[75%] px-3 py-1.5 rounded-xl text-xs italic text-muted-foreground ${
-            isOwn ? "bg-muted/30 rounded-tr-sm" : "bg-muted/20 rounded-tl-sm"
+          className={`max-w-[75%] px-3 py-1.5 rounded-xl text-xs italic text-muted-foreground border border-border/50 ${
+            isOwn ? "bg-muted/40 rounded-tr-sm" : "bg-muted/20 rounded-tl-sm"
           }`}
         >
-          <svg className="inline-block w-3.5 h-3.5 mr-1 -mt-0.5 opacity-50" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <svg className="inline-block w-3.5 h-3.5 mr-1 -mt-0.5 opacity-60" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" />
           </svg>
           This message was deleted
@@ -161,8 +161,8 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
         <div
           className={`w-8 h-8 rounded-full shrink-0 flex items-center justify-center text-xs font-bold ${
             isOwn
-              ? "bg-accent/15 text-accent"
-              : "bg-primary/10 text-primary"
+              ? "bg-emerald-100 text-emerald-900 dark:bg-emerald-900/40 dark:text-emerald-300"
+              : "bg-muted text-foreground"
           }`}
         >
           {displayName.charAt(0).toUpperCase()}
@@ -187,7 +187,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
               isOwn ? "flex-row-reverse" : ""
             }`}
           >
-            <svg className="w-3 h-3 opacity-60" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <svg className="w-3 h-3 opacity-70" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" />
             </svg>
             <span className="italic truncate max-w-[200px]">reply</span>
@@ -196,9 +196,9 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
 
         {/* Message bubble */}
         <div
-          className={`relative px-3 py-2 rounded-2xl text-sm leading-relaxed break-words whitespace-pre-wrap transition-colors ${
+          className={`relative px-3.5 py-2.5 rounded-2xl text-sm leading-relaxed break-words whitespace-pre-wrap transition-colors shadow-sm ${
             isOwn
-              ? "bg-accent text-white rounded-tr-sm"
+              ? "bg-emerald-100 text-emerald-950 border border-emerald-300/80 dark:border-emerald-700/60 dark:bg-emerald-900/60 dark:text-emerald-50 rounded-tr-sm"
               : "bg-card border border-border text-foreground rounded-tl-sm"
           }`}
         >
@@ -206,7 +206,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
 
           {/* Edited indicator */}
           {message.is_edited && (
-            <span className={`text-[10px] ml-1 ${isOwn ? "text-white/50" : "text-muted-foreground"}`}>
+            <span className={`text-[10px] ml-1.5 ${isOwn ? "text-emerald-800/80 dark:text-emerald-300/70" : "text-muted-foreground"}`}>
               (edited)
             </span>
           )}
@@ -220,7 +220,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
               {/* Reaction button */}
               <button
                 onClick={() => setShowReactionPicker(!showReactionPicker)}
-                className="p-1 rounded hover:bg-muted/50 text-muted-foreground hover:text-foreground transition-colors"
+                className="p-1.5 rounded-md hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
                 title="React"
               >
                 <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -231,7 +231,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
               {/* Reply button */}
               <button
                 onClick={onReply}
-                className="p-1 rounded hover:bg-muted/50 text-muted-foreground hover:text-foreground transition-colors"
+                className="p-1.5 rounded-md hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
                 title="Reply"
               >
                 <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -243,7 +243,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
               {isOwn && !message.is_deleted && (
                 <button
                   onClick={onEdit}
-                  className="p-1 rounded hover:bg-muted/50 text-muted-foreground hover:text-foreground transition-colors"
+                  className="p-1.5 rounded-md hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
                   title="Edit"
                 >
                   <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -256,7 +256,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
               {isOwn && !message.is_deleted && (
                 <button
                   onClick={onDelete}
-                  className="p-1 rounded hover:bg-destructive/20 text-muted-foreground hover:text-destructive transition-colors"
+                  className="p-1.5 rounded-md hover:bg-destructive/10 text-muted-foreground hover:text-destructive transition-colors"
                   title="Delete"
                 >
                   <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -277,8 +277,8 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
                         onReaction(emoji);
                         setShowReactionPicker(false);
                       }}
-                      className={`w-8 h-8 rounded-lg flex items-center justify-center text-base hover:bg-accent/10 transition-colors ${
-                        hasReacted(emoji) ? "bg-accent/15 ring-1 ring-accent/30" : ""
+                      className={`w-8 h-8 rounded-lg flex items-center justify-center text-base hover:bg-muted transition-colors ${
+                        hasReacted(emoji) ? "bg-accent/20 ring-1 ring-accent" : ""
                       }`}
                     >
                       {emoji}
@@ -297,10 +297,10 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
               <button
                 key={emoji}
                 onClick={() => onReaction(emoji)}
-                className={`inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-xs border transition-colors ${
+                className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs border transition-colors ${
                   hasReacted(emoji)
-                    ? "bg-accent/10 border-accent/30 text-accent"
-                    : "bg-card border-border text-muted-foreground hover:border-accent/30"
+                    ? "bg-accent/15 border-accent/40 text-accent font-semibold"
+                    : "bg-card border-border text-muted-foreground hover:text-foreground hover:border-border/80"
                 }`}
                 title={users.join(", ")}
               >

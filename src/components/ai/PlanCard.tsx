@@ -62,9 +62,9 @@ export const PlanCard: React.FC<PlanCardProps> = ({
   }
 
   return (
-    <div className="bg-card/80 border border-accent/40 rounded-xl p-4 space-y-3.5 shadow-sm text-xs">
+    <div className="bg-card border border-border rounded-xl p-4 space-y-3.5 shadow-sm text-xs">
       {/* Header */}
-      <div className="flex items-start justify-between gap-2 border-b border-border/60 pb-2.5">
+      <div className="flex items-start justify-between gap-2 border-b border-border pb-2.5">
         <div>
           <div className="flex items-center gap-1.5 mb-1">
             <Badge variant="accent" className="text-[10px]">
@@ -92,7 +92,7 @@ export const PlanCard: React.FC<PlanCardProps> = ({
         {plan.tasks.map((task, idx) => (
           <div
             key={idx}
-            className="p-2.5 bg-muted/40 rounded-lg border border-border/60 space-y-1"
+            className="p-2.5 bg-muted/40 rounded-lg border border-border space-y-1"
           >
             <div className="flex items-center gap-2">
               <span className="w-1.5 h-1.5 rounded-full bg-accent" />

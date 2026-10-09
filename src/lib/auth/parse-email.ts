@@ -47,35 +47,72 @@ export function parseCollegeEmail(email: string): ParsedCollegeEmail | null {
   if (!segments.every((s) => alphanumericPattern.test(s))) return null;
 
   if (segments.length === 4) {
-    // Student: name.initial.YY.dept
+    // Student: name.initial.YY.dept or name.initial.YYYY.dept
     const [name, initial, yearStr, department] = segments;
 
-    // Validate year is exactly 2 digits
-    if (!/^\d{2}$/.test(yearStr)) return null;
-
-    const year = 2000 + parseInt(yearStr, 10);
-
-    return {
-      kind: "student",
-      name,
-      initial,
-      year,
-      department: department.toUpperCase(),
-      email: trimmed,
-    };
+    if (/^\d{2}$/.test(yearStr)) {
+      return {
+        kind: "student",
+        name,
+        initial,
+        year: 2000 + parseInt(yearStr, 10),
+        department: department.toUpperCase(),
+        email: trimmed,
+      };
+    } else if (/^\d{4}$/.test(yearStr)) {
+      return {
+        kind: "student",
+        name,
+        initial,
+        year: parseInt(yearStr, 10),
+        department: department.toUpperCase(),
+        email: trimmed,
+      };
+    }
   } else if (segments.length === 3) {
-    // Staff: name.initial.dept
-    const [name, initial, department] = segments;
+    const [part1, part2, part3] = segments;
 
-    // Ensure the 3rd segment is NOT purely numeric (that would be ambiguous)
-    if (/^\d+$/.test(department)) return null;
+    // Student: name.YY.dept or name.YYYY.dept
+    if (/^\d{2}$/.test(part2)) {
+      return {
+        kind: "student",
+        name: part1,
+        initial: "",
+        year: 2000 + parseInt(part2, 10),
+        department: part3.toUpperCase(),
+        email: trimmed,
+      };
+    } else if (/^\d{4}$/.test(part2)) {
+      return {
+        kind: "student",
+        name: part1,
+        initial: "",
+        year: parseInt(part2, 10),
+        department: part3.toUpperCase(),
+        email: trimmed,
+      };
+    }
 
+    // Staff: name.initial.dept (part3 must not be numeric)
+    if (!/^\d+$/.test(part3)) {
+      return {
+        kind: "staff",
+        name: part1,
+        initial: part2,
+        year: null,
+        department: part3.toUpperCase(),
+        email: trimmed,
+      };
+    }
+  } else if (segments.length === 1) {
+    // Staff: staffname@domain
+    const [name] = segments;
     return {
       kind: "staff",
       name,
-      initial,
+      initial: "",
       year: null,
-      department: department.toUpperCase(),
+      department: "FACULTY",
       email: trimmed,
     };
   }

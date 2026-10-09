@@ -63,6 +63,14 @@ describe("parseCollegeEmail", () => {
     expect(result!.name).toBe("prof1");
   });
 
+  it("parses a single-name staff email (e.g. staffname@rajalakshmi.edu.in)", () => {
+    const result = parseCollegeEmail("staffname@rajalakshmi.edu.in");
+    expect(result).not.toBeNull();
+    expect(result!.kind).toBe("staff");
+    expect(result!.name).toBe("staffname");
+    expect(result!.year).toBeNull();
+  });
+
   // Invalid emails
   it("rejects a non-college domain (gmail.com)", () => {
     expect(parseCollegeEmail("john.d.22.cse@gmail.com")).toBeNull();
@@ -106,8 +114,23 @@ describe("parseCollegeEmail", () => {
     expect(parseCollegeEmail("john.d.123@rajlakshmi.edu.in")).toBeNull();
   });
 
-  it("rejects student email where year is not exactly 2 digits", () => {
-    expect(parseCollegeEmail("john.d.2022.cse@rajlakshmi.edu.in")).toBeNull();
+  it("parses student email with 4-digit year (2023)", () => {
+    const result = parseCollegeEmail("john.d.2023.cse@rajalakshmi.edu.in");
+    expect(result).not.toBeNull();
+    expect(result!.kind).toBe("student");
+    expect(result!.year).toBe(2023);
+    expect(result!.department).toBe("CSE");
+  });
+
+  it("parses student email with 3 segments and batch year (name.23.cse)", () => {
+    const result = parseCollegeEmail("karthik.23.cse@rajalakshmi.edu.in");
+    expect(result).not.toBeNull();
+    expect(result!.kind).toBe("student");
+    expect(result!.year).toBe(2023);
+    expect(result!.department).toBe("CSE");
+  });
+
+  it("rejects student email where year is invalid single digit", () => {
     expect(parseCollegeEmail("john.d.2.cse@rajlakshmi.edu.in")).toBeNull();
   });
 });

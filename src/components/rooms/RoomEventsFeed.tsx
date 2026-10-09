@@ -40,7 +40,7 @@ export const RoomEventsFeed: React.FC<RoomEventsFeedProps> = ({ events, loading 
         );
       case "lead_swapped":
         return (
-          <div className="mt-1 text-xs text-indigo-600 dark:text-indigo-400 font-medium">
+          <div className="mt-1 text-xs text-accent font-semibold">
             Leadership was transferred to a new team lead.
           </div>
         );
@@ -52,7 +52,7 @@ export const RoomEventsFeed: React.FC<RoomEventsFeedProps> = ({ events, loading 
         );
       case "member_readded":
         return (
-          <div className="mt-1 text-xs text-emerald-600 dark:text-emerald-400 font-medium">
+          <div className="mt-1 text-xs text-emerald-700 dark:text-emerald-300 font-semibold">
             A past member was re-added to the team.
           </div>
         );

@@ -116,11 +116,11 @@ export const CreateTaskModal: React.FC<CreateTaskModalProps> = ({
             <select
               value={status}
               onChange={(e) => setStatus(e.target.value as TaskStatusEnum)}
-              className="w-full bg-muted/70 border border-border rounded-lg px-3 py-2 text-sm text-foreground focus:ring-1 focus:ring-accent focus:outline-none"
+              className="w-full bg-background border border-border rounded-lg px-3 py-2 text-sm text-foreground focus:ring-2 focus:ring-accent focus:outline-none"
             >
-              <option value="todo">To do</option>
-              <option value="in_progress">In progress</option>
-              <option value="done">Done</option>
+              <option value="todo" className="bg-card text-foreground">To do</option>
+              <option value="in_progress" className="bg-card text-foreground">In progress</option>
+              <option value="done" className="bg-card text-foreground">Done</option>
             </select>
           </div>
 
@@ -132,7 +132,7 @@ export const CreateTaskModal: React.FC<CreateTaskModalProps> = ({
               type="date"
               value={dueDate}
               onChange={(e) => setDueDate(e.target.value)}
-              className="w-full bg-muted/70 border border-border rounded-lg px-3 py-2 text-sm text-foreground focus:ring-1 focus:ring-accent focus:outline-none"
+              className="w-full bg-background border border-border rounded-lg px-3 py-2 text-sm text-foreground focus:ring-2 focus:ring-accent focus:outline-none [color-scheme:light] dark:[color-scheme:dark]"
             />
           </div>
         </div>
@@ -141,7 +141,7 @@ export const CreateTaskModal: React.FC<CreateTaskModalProps> = ({
           <label className="block text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">
             Assign To
           </label>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-36 overflow-y-auto p-1 border rounded-lg bg-muted/20">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-36 overflow-y-auto p-1.5 border border-border rounded-lg bg-muted/30">
             {members
               .filter((m) => m.status === "active")
               .map((member) => {
@@ -153,8 +153,8 @@ export const CreateTaskModal: React.FC<CreateTaskModalProps> = ({
                     onClick={() => toggleAssignee(member.user_id)}
                     className={`flex items-center gap-2 p-2 rounded-md text-left text-xs transition-colors ${
                       isSelected
-                        ? "bg-accent/15 text-accent font-medium border border-accent/30"
-                        : "hover:bg-muted/60 text-muted-foreground"
+                        ? "bg-accent/15 text-accent font-semibold border border-accent/30"
+                        : "hover:bg-muted text-foreground"
                     }`}
                   >
                     <input

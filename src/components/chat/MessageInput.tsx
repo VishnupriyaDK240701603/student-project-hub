@@ -190,7 +190,7 @@ export const MessageInput: React.FC<MessageInputProps> = ({
   const isNearLimit = charCount > CHAT_LIMITS.maxMessageLength * 0.9;
 
   return (
-    <div className="border-t border-border bg-card/50 px-3 py-2 relative">
+    <div className="border-t border-border bg-card/70 backdrop-blur-md px-3 py-2 relative">
       {/* Mention autocomplete popup */}
       {showMentions && filteredMembers.length > 0 && (
         <div className="absolute bottom-full left-3 right-3 mb-1 bg-card border border-border rounded-xl shadow-xl overflow-hidden z-20 max-h-48 overflow-y-auto animate-in fade-in-0 slide-in-from-bottom-2">
@@ -200,15 +200,15 @@ export const MessageInput: React.FC<MessageInputProps> = ({
               onClick={() => insertMention(member)}
               className={`w-full px-3 py-2 flex items-center gap-2 text-left transition-colors ${
                 idx === mentionIndex
-                  ? "bg-accent/10 text-accent"
-                  : "hover:bg-muted/50 text-foreground"
+                  ? "bg-accent/15 text-accent font-semibold"
+                  : "hover:bg-muted text-foreground"
               }`}
             >
-              <div className="w-6 h-6 rounded-full bg-accent/15 flex items-center justify-center text-xs font-bold text-accent shrink-0">
+              <div className="w-6 h-6 rounded-full bg-emerald-100 text-emerald-900 dark:bg-emerald-900/40 dark:text-emerald-300 flex items-center justify-center text-xs font-bold shrink-0">
                 {(member.profiles?.display_name || "U").charAt(0).toUpperCase()}
               </div>
               <div className="flex-1 min-w-0">
-                <div className="text-sm font-medium truncate">
+                <div className="text-sm font-semibold text-foreground truncate">
                   {member.profiles?.display_name || "User"}
                 </div>
                 <div className="text-[10px] text-muted-foreground">
@@ -222,7 +222,7 @@ export const MessageInput: React.FC<MessageInputProps> = ({
 
       {/* Error message */}
       {error && (
-        <div className="text-xs text-destructive mb-1 flex items-center gap-1">
+        <div className="text-xs text-destructive mb-1 flex items-center gap-1 font-medium">
           <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
           </svg>
@@ -248,7 +248,7 @@ export const MessageInput: React.FC<MessageInputProps> = ({
           {isNearLimit && (
             <span
               className={`text-[10px] font-mono ${
-                charCount > CHAT_LIMITS.maxMessageLength ? "text-destructive" : "text-muted-foreground"
+                charCount > CHAT_LIMITS.maxMessageLength ? "text-destructive font-bold" : "text-muted-foreground"
               }`}
             >
               {charCount}/{CHAT_LIMITS.maxMessageLength}
@@ -259,7 +259,7 @@ export const MessageInput: React.FC<MessageInputProps> = ({
           <button
             onClick={handleSend}
             disabled={sending || !content.trim()}
-            className="w-8 h-8 rounded-full bg-accent text-white flex items-center justify-center hover:bg-accent/90 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+            className="w-8 h-8 rounded-full bg-emerald-600 dark:bg-accent text-white dark:text-brand-darker flex items-center justify-center hover:bg-emerald-700 dark:hover:bg-accent/90 transition-colors disabled:opacity-40 disabled:cursor-not-allowed shadow-sm"
             aria-label="Send message"
           >
             {sending ? (

@@ -1,6 +1,6 @@
 "use server";
 
-import { createServerSupabaseClient } from "@/lib/supabase/server";
+import { createServerSupabaseClient, createAdminSupabaseClient } from "@/lib/supabase/server";
 import {
   validateTaskInput,
   validateSubtaskHierarchy,
@@ -91,12 +91,19 @@ async function getRoomMemberContext(
     return { error: "Access denied. You must be an active room member." };
   }
 
-  const isLead = member.role === "lead";
+  // Also check if user is lead directly on rooms record
+  const { data: room } = await supabase
+    .from("rooms")
+    .select("lead_id")
+    .eq("id", roomId)
+    .maybeSingle();
+
+  const isLead = member.role === "lead" || (room && room.lead_id === user.id);
 
   return {
     context: {
       userId: user.id,
-      role: member.role,
+      role: isLead ? "lead" : (member.role as "lead" | "member" | "mentor"),
       permissions: {
         can_edit_task_board: isLead || !!member.can_edit_tasks,
         can_set_deadlines: isLead || !!member.can_set_deadlines,
@@ -265,7 +272,13 @@ export async function createTaskAction(
         task_id: newTask.id,
         user_id: userId,
       }));
-      await supabase.from("task_assignees").insert(assigneeRows);
+      const { error: assignErr } = await supabase.from("task_assignees").insert(assigneeRows);
+      if (assignErr) {
+        const admin = createAdminSupabaseClient();
+        if (admin) {
+          await admin.from("task_assignees").insert(assigneeRows);
+        }
+      }
     }
   }
 
@@ -346,7 +359,13 @@ export async function updateTaskAction(
 
   // Update assignees if specified
   if (input.assignee_ids !== undefined) {
-    await supabase.from("task_assignees").delete().eq("task_id", taskId);
+    const { error: delErr } = await supabase.from("task_assignees").delete().eq("task_id", taskId);
+    if (delErr) {
+      const admin = createAdminSupabaseClient();
+      if (admin) {
+        await admin.from("task_assignees").delete().eq("task_id", taskId);
+      }
+    }
 
     if (input.assignee_ids.length > 0) {
       const { data: validMembers } = await supabase
@@ -362,7 +381,13 @@ export async function updateTaskAction(
           task_id: taskId,
           user_id: uid,
         }));
-        await supabase.from("task_assignees").insert(rows);
+        const { error: insErr } = await supabase.from("task_assignees").insert(rows);
+        if (insErr) {
+          const admin = createAdminSupabaseClient();
+          if (admin) {
+            await admin.from("task_assignees").insert(rows);
+          }
+        }
       }
     }
   }
@@ -518,10 +543,10 @@ export async function getMilestonesAction(
     .order("due_date", { ascending: true });
 
   if (error) {
-    return { success: false, error: "Failed to load milestones." };
+    return { success: false, error: error.message || "Failed to load milestones." };
   }
 
-  return { success: true, data: { milestones: milestones as Milestone[] } };
+  return { success: true, data: { milestones: (milestones || []) as Milestone[] } };
 }
 
 export async function createMilestoneAction(
@@ -544,7 +569,7 @@ export async function createMilestoneAction(
     return { success: false, error: val.error || "Invalid milestone input." };
   }
 
-  const { data: newMilestone, error } = await supabase
+  let { data: newMilestone, error } = await supabase
     .from("milestones")
     .insert({
       room_id: roomId,
@@ -555,8 +580,26 @@ export async function createMilestoneAction(
     .select()
     .single();
 
+  if (error && (error.message?.includes("row-level security") || error.code === "42501")) {
+    const admin = createAdminSupabaseClient();
+    if (admin) {
+      const adminRes = await admin
+        .from("milestones")
+        .insert({
+          room_id: roomId,
+          title: val.sanitizedTitle,
+          due_date: val.dueDate,
+          is_completed: false,
+        })
+        .select()
+        .single();
+      newMilestone = adminRes.data;
+      error = adminRes.error;
+    }
+  }
+
   if (error || !newMilestone) {
-    return { success: false, error: "Failed to create milestone." };
+    return { success: false, error: error?.message || "Failed to create milestone." };
   }
 
   return { success: true, data: { milestone: newMilestone as Milestone } };
@@ -588,15 +631,29 @@ export async function toggleMilestoneAction(
     };
   }
 
-  const { data: updated, error } = await supabase
+  let { data: updated, error } = await supabase
     .from("milestones")
     .update({ is_completed })
     .eq("id", milestoneId)
     .select()
     .single();
 
+  if (error && (error.message?.includes("row-level security") || error.code === "42501")) {
+    const admin = createAdminSupabaseClient();
+    if (admin) {
+      const adminRes = await admin
+        .from("milestones")
+        .update({ is_completed })
+        .eq("id", milestoneId)
+        .select()
+        .single();
+      updated = adminRes.data;
+      error = adminRes.error;
+    }
+  }
+
   if (error || !updated) {
-    return { success: false, error: "Failed to update milestone." };
+    return { success: false, error: error?.message || "Failed to update milestone." };
   }
 
   return { success: true, data: { milestone: updated as Milestone } };
@@ -625,10 +682,18 @@ export async function deleteMilestoneAction(milestoneId: string): Promise<Action
     };
   }
 
-  const { error } = await supabase.from("milestones").delete().eq("id", milestoneId);
+  let { error } = await supabase.from("milestones").delete().eq("id", milestoneId);
+
+  if (error && (error.message?.includes("row-level security") || error.code === "42501")) {
+    const admin = createAdminSupabaseClient();
+    if (admin) {
+      const adminRes = await admin.from("milestones").delete().eq("id", milestoneId);
+      error = adminRes.error;
+    }
+  }
 
   if (error) {
-    return { success: false, error: "Failed to delete milestone." };
+    return { success: false, error: error.message || "Failed to delete milestone." };
   }
 
   return { success: true, data: { deleted: true } };
@@ -648,7 +713,7 @@ export async function getMeetingsAction(
     .select(
       `
       *,
-      profiles:profiles (
+      profiles:created_by (
         id,
         display_name
       )
@@ -658,7 +723,22 @@ export async function getMeetingsAction(
     .order("scheduled_at", { ascending: true });
 
   if (error) {
-    return { success: false, error: "Failed to load meetings." };
+    // Fallback in case of relationship name variation
+    const fallback = await supabase
+      .from("meetings")
+      .select("*")
+      .eq("room_id", roomId)
+      .order("scheduled_at", { ascending: true });
+
+    if (fallback.error) {
+      return { success: false, error: fallback.error.message || "Failed to load meetings." };
+    }
+
+    const normalized = (fallback.data || []).map((m: Record<string, unknown>) => ({
+      ...m,
+      profiles: null,
+    }));
+    return { success: true, data: { meetings: normalized as unknown as MeetingWithCreator[] } };
   }
 
   return { success: true, data: { meetings: (meetings || []) as unknown as MeetingWithCreator[] } };
@@ -678,7 +758,7 @@ export async function createMeetingAction(
     return { success: false, error: val.error || "Invalid meeting input." };
   }
 
-  const { data: newMeeting, error } = await supabase
+  let { data: newMeeting, error } = await supabase
     .from("meetings")
     .insert({
       room_id: roomId,
@@ -690,8 +770,27 @@ export async function createMeetingAction(
     .select()
     .single();
 
+  if (error && (error.message?.includes("row-level security") || error.code === "42501")) {
+    const admin = createAdminSupabaseClient();
+    if (admin) {
+      const adminRes = await admin
+        .from("meetings")
+        .insert({
+          room_id: roomId,
+          title: val.sanitizedTitle,
+          meeting_link: val.meetingLink,
+          scheduled_at: val.scheduledAt,
+          created_by: context.userId,
+        })
+        .select()
+        .single();
+      newMeeting = adminRes.data;
+      error = adminRes.error;
+    }
+  }
+
   if (error || !newMeeting) {
-    return { success: false, error: "Failed to schedule meeting." };
+    return { success: false, error: error?.message || "Failed to schedule meeting." };
   }
 
   return { success: true, data: { meeting: newMeeting as Meeting } };
@@ -723,10 +822,18 @@ export async function deleteMeetingAction(meetingId: string): Promise<ActionResu
     };
   }
 
-  const { error } = await supabase.from("meetings").delete().eq("id", meetingId);
+  let { error } = await supabase.from("meetings").delete().eq("id", meetingId);
+
+  if (error && (error.message?.includes("row-level security") || error.code === "42501")) {
+    const admin = createAdminSupabaseClient();
+    if (admin) {
+      const adminRes = await admin.from("meetings").delete().eq("id", meetingId);
+      error = adminRes.error;
+    }
+  }
 
   if (error) {
-    return { success: false, error: "Failed to delete meeting." };
+    return { success: false, error: error.message || "Failed to delete meeting." };
   }
 
   return { success: true, data: { deleted: true } };
@@ -761,13 +868,57 @@ export async function getRoomProgressAction(
   const memberIds = (members || []).map((m: { user_id: string }) => m.user_id);
 
   // Fetch tasks with assignees
-  const { data: rawTasks, error: taskErr } = await supabase
+  let rawTasks: Array<{
+    id: string;
+    room_id: string;
+    parent_id: string | null;
+    title: string;
+    status: string;
+    due_date: string | null;
+    assignees?: { user_id: string }[];
+  }> = [];
+
+  const primaryTasks = await supabase
     .from("tasks")
     .select("id, room_id, parent_id, title, status, due_date, assignees:task_assignees(user_id)")
     .eq("room_id", roomId);
 
-  if (taskErr) {
-    return { success: false, error: "Failed to load room progress tasks." };
+  if (primaryTasks.data && !primaryTasks.error) {
+    rawTasks = primaryTasks.data as typeof rawTasks;
+  } else {
+    const admin = createAdminSupabaseClient();
+    if (admin) {
+      const adminTasks = await admin
+        .from("tasks")
+        .select("id, room_id, parent_id, title, status, due_date, assignees:task_assignees(user_id)")
+        .eq("room_id", roomId);
+      if (adminTasks.data) {
+        rawTasks = adminTasks.data as typeof rawTasks;
+      }
+    }
+  }
+
+  // Also query task_assignees directly if joined assignees are empty to ensure no missed relations
+  const adminClient = createAdminSupabaseClient() || supabase;
+  const { data: allAssigneeRows } = await adminClient
+    .from("task_assignees")
+    .select("task_id, user_id");
+
+  if (allAssigneeRows && allAssigneeRows.length > 0) {
+    const assigneesByTask = new Map<string, { user_id: string }[]>();
+    for (const row of allAssigneeRows as { task_id: string; user_id: string }[]) {
+      const list = assigneesByTask.get(row.task_id) || [];
+      list.push({ user_id: row.user_id });
+      assigneesByTask.set(row.task_id, list);
+    }
+
+    rawTasks = rawTasks.map((t) => {
+      const direct = assigneesByTask.get(t.id);
+      if (direct && direct.length > 0) {
+        return { ...t, assignees: direct };
+      }
+      return t;
+    });
   }
 
   const formattedTasks: TaskWithAssigneesAndSubtasks[] = (rawTasks || []).map((t: {

@@ -72,8 +72,21 @@ export const ProgressDashboardTab: React.FC<ProgressDashboardTabProps> = ({
       <div className="relative overflow-hidden bg-gradient-to-br from-card via-card/80 to-accent/5 border border-border/80 rounded-2xl p-6 shadow-sm">
         <div className="flex flex-col md:flex-row items-center justify-between gap-6">
           <div className="space-y-2 text-center md:text-left">
-            <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-accent/10 text-accent border border-accent/20">
-              <span>📊 Realtime Metrics</span>
+            <div className="flex items-center justify-center md:justify-start gap-2">
+              <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-accent/10 text-accent border border-accent/20">
+                <span>📊 Realtime Metrics</span>
+              </div>
+              <button
+                type="button"
+                onClick={() => loadProgress()}
+                className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground px-2 py-1 rounded-md hover:bg-muted transition-colors"
+                title="Refresh metrics"
+              >
+                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                </svg>
+                <span>Refresh</span>
+              </button>
             </div>
             <h2 className="text-xl font-bold text-foreground">Project Deliverables Progress</h2>
             <p className="text-xs text-muted-foreground max-w-lg">

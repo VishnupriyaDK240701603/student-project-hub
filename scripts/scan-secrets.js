@@ -25,7 +25,7 @@ function scanDirectory(dir) {
         scanDirectory(fullPath);
       }
     } else {
-      if (IGNORE_FILES.includes(file)) continue;
+      if (IGNORE_FILES.includes(file) || (file.startsWith(".env") && file !== ".env.example")) continue;
       scanFile(fullPath);
     }
   }

@@ -453,8 +453,9 @@ export async function uploadRoomFileAction(
     return { success: false, error: `Upload failed: ${uploadError.message}` };
   }
 
-  // Insert record
-  const { data: fileRecord, error: insertError } = await supabase
+  // Insert record with resilience across column name schemas (file_type vs mime_type, uploaded_by vs uploader_id)
+  let fileRecord: Record<string, unknown> | null = null;
+  const primaryInsert = await supabase
     .from("room_files")
     .insert({
       room_id: roomId,
@@ -467,15 +468,47 @@ export async function uploadRoomFileAction(
     .select()
     .single();
 
-  if (insertError || !fileRecord) {
-    return { success: false, error: insertError?.message || "Failed to record file." };
+  if (!primaryInsert.error && primaryInsert.data) {
+    fileRecord = primaryInsert.data as Record<string, unknown>;
+  } else {
+    // Fallback attempt with legacy column names (uploader_id / mime_type) if schema cache has older names
+    const fallbackInsert = await supabase
+      .from("room_files")
+      .insert({
+        room_id: roomId,
+        uploader_id: user.id,
+        storage_path: storagePath,
+        file_name: validation.sanitizedFilename || fileName,
+        mime_type: fileType,
+        file_size_bytes: fileSizeBytes,
+      } as unknown as Record<string, unknown>)
+      .select()
+      .single();
+
+    if (!fallbackInsert.error && fallbackInsert.data) {
+      fileRecord = fallbackInsert.data as Record<string, unknown>;
+    } else {
+      const errMsg = primaryInsert.error?.message || fallbackInsert.error?.message || "Failed to record file in database.";
+      return { success: false, error: errMsg };
+    }
   }
+
+  const normalizedRecord: RoomFile = {
+    id: fileRecord.id as string,
+    room_id: fileRecord.room_id as string,
+    uploaded_by: (fileRecord.uploaded_by || fileRecord.uploader_id) as string,
+    storage_path: fileRecord.storage_path as string,
+    file_name: fileRecord.file_name as string,
+    file_type: (fileRecord.file_type || fileRecord.mime_type || fileType) as string,
+    file_size_bytes: (fileRecord.file_size_bytes ?? fileSizeBytes) as number,
+    created_at: fileRecord.created_at as string,
+  };
 
   // Audit log
   await supabase.from("audit_log").insert({
     actor_id: user.id,
     action: "room_file.uploaded",
-    target: fileRecord.id,
+    target: normalizedRecord.id,
     metadata: {
       room_id: roomId,
       file_name: validation.sanitizedFilename,
@@ -483,7 +516,7 @@ export async function uploadRoomFileAction(
     },
   });
 
-  return { success: true, data: { file: fileRecord as RoomFile } };
+  return { success: true, data: { file: normalizedRecord } };
 }
 
 /**
@@ -511,17 +544,20 @@ export async function deleteRoomFileAction(
     return { success: false, error: "File not found." };
   }
 
+  const rawRec = fileRecord as Record<string, unknown>;
+  const uploaderId = (rawRec.uploaded_by || rawRec.uploader_id) as string;
+
   const membership = await verifyRoomMembership(supabase as never, user.id, fileRecord.room_id);
   if (!membership.isMember) {
     return { success: false, error: "Access denied." };
   }
 
   // Only uploader or lead can delete
-  if (fileRecord.uploaded_by !== user.id && !membership.isLead) {
+  if (uploaderId !== user.id && !membership.isLead) {
     return { success: false, error: "Only the uploader or team lead can delete this file." };
   }
 
-  // Delete from storage
+  // Delete from storage (best-effort)
   await supabase.storage.from("room-files").remove([fileRecord.storage_path]);
 
   // Delete record
@@ -569,6 +605,7 @@ export async function getRoomFilesAction(
     return { success: false, error: "Access denied." };
   }
 
+  // Try fetching with profiles relation on uploaded_by, then uploader_id if needed
   const { data, error } = await supabase
     .from("room_files")
     .select("*, profiles:uploaded_by(display_name)")
@@ -576,10 +613,34 @@ export async function getRoomFilesAction(
     .order("created_at", { ascending: false });
 
   if (error) {
-    return { success: false, error: error.message };
+    // Fallback without relation join to ensure files are never blocked
+    const fallback = await supabase
+      .from("room_files")
+      .select("*")
+      .eq("room_id", roomId)
+      .order("created_at", { ascending: false });
+
+    if (fallback.error) {
+      return { success: false, error: fallback.error.message };
+    }
+
+    const normalized = (fallback.data || []).map((row: Record<string, unknown>) => ({
+      ...row,
+      uploaded_by: (row.uploaded_by || row.uploader_id) as string,
+      file_type: (row.file_type || row.mime_type || "application/octet-stream") as string,
+      profiles: null,
+    }));
+
+    return { success: true, data: normalized as unknown as RoomFileWithUploader[] };
   }
 
-  return { success: true, data: (data || []) as unknown as RoomFileWithUploader[] };
+  const normalized = (data || []).map((row: Record<string, unknown>) => ({
+    ...row,
+    uploaded_by: (row.uploaded_by || row.uploader_id) as string,
+    file_type: (row.file_type || row.mime_type || "application/octet-stream") as string,
+  }));
+
+  return { success: true, data: normalized as unknown as RoomFileWithUploader[] };
 }
 
 /**

@@ -1,7 +1,7 @@
 "use server";
 
 import { createServerSupabaseClient } from "@/lib/supabase/server";
-import { HuggingFaceProvider, type AiProvider } from "@/lib/ai/provider";
+import { createDefaultProvider, type AiProvider } from "@/lib/ai/provider";
 import { buildAiPromptMessages, type RoomContextData } from "@/lib/ai/context-builder";
 import {
   parseAiResponse,
@@ -47,9 +47,9 @@ export async function askRoomAiAction(
     return { success: false, error: "Access denied. You must be an active room member." };
   }
 
-  // 2. Check if AI is enabled in environment
-  const isAiEnabled = process.env.AI_ENABLED === "true";
-  if (!isAiEnabled && !customProvider) {
+  // 2. Check if AI is enabled in environment (enabled by default unless explicitly disabled as "false")
+  const isAiDisabled = process.env.AI_ENABLED === "false";
+  if (isAiDisabled && !customProvider) {
     return {
       success: true,
       data: {
@@ -107,12 +107,17 @@ export async function askRoomAiAction(
       .limit(10),
     supabase
       .from("room_files")
-      .select("file_name, file_type")
+      .select("*")
       .eq("room_id", roomId)
       .limit(20),
   ]);
 
   const teamReq = roomRes.data?.team_requests as { title?: string; description?: string } | null;
+
+  const normalizedFiles = (fileRes.data || []).map((f: Record<string, unknown>) => ({
+    file_name: (f.file_name as string) || "file",
+    file_type: ((f.file_type || f.mime_type) as string) || "application/octet-stream",
+  })) as Pick<RoomFile, "file_name" | "file_type">[];
 
   const contextData: RoomContextData = {
     projectTitle: teamReq?.title || "Team Project",
@@ -123,12 +128,12 @@ export async function askRoomAiAction(
     tasks: (taskRes.data || []) as Pick<Task, "title" | "status" | "due_date">[],
     milestones: (milestoneRes.data || []) as Pick<Milestone, "title" | "due_date" | "is_completed">[],
     meetings: (meetingRes.data || []) as Pick<Meeting, "title" | "scheduled_at">[],
-    files: (fileRes.data || []) as Pick<RoomFile, "file_name" | "file_type">[],
+    files: normalizedFiles,
   };
 
   // 5. Build prompt messages and execute AI generation
   const messages = buildAiPromptMessages(query, contextData);
-  const provider = customProvider || new HuggingFaceProvider();
+  const provider = customProvider || createDefaultProvider();
 
   const aiResult = await provider.generate(messages, {
     temperature: 0.7,

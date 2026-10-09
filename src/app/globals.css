@@ -2,21 +2,189 @@
 @tailwind components;
 @tailwind utilities;
 
-:root {
-  --background: #f8fafc;
-  --foreground: #0f172a;
-}
-
-@media (prefers-color-scheme: dark) {
+@layer base {
   :root {
-    --background: #0f172a;
-    --foreground: #f8fafc;
+    --background: #f4f7f5;
+    --foreground: #0d1f14;
+    --card: #ffffff;
+    --card-foreground: #0d1f14;
+    --primary: #143d28;
+    --primary-hover: #1e5338;
+    --primary-foreground: #ffffff;
+    --border: #d4e0d8;
+    --input: #d4e0d8;
+    --muted: #e6ede8;
+    --muted-foreground: #455f4f;
+    --accent: #1e5338;
+    --accent-foreground: #ffffff;
+    --destructive: #b91c1c;
+    --destructive-foreground: #ffffff;
+  }
+
+  .dark {
+    --background: #08150e;
+    --foreground: #f4fbf6;
+    --card: #0e2016;
+    --card-foreground: #f4fbf6;
+    --primary: #52b788;
+    --primary-hover: #74c69d;
+    --primary-foreground: #06180e;
+    --border: #1d3d2a;
+    --input: #1d3d2a;
+    --muted: #132a1d;
+    --muted-foreground: #98c2ab;
+    --accent: #52b788;
+    --accent-foreground: #06180e;
+    --destructive: #f87171;
+    --destructive-foreground: #ffffff;
+  }
+
+  body {
+    color: var(--foreground);
+    background-color: var(--background);
+    font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    min-height: 100vh;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+    overflow-x: hidden;
+  }
+
+  :focus-visible {
+    outline: 2px solid #2d6a4f;
+    outline-offset: 3px;
+  }
+
+  .dark :focus-visible {
+    outline-color: #74c69d;
   }
 }
 
-body {
-  color: var(--foreground);
-  background: var(--background);
-  font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-  min-height: 100vh;
+.pb-safe {
+  padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 0.5rem);
 }
+
+/* Background Glowing Mesh Effects */
+.bg-mesh-dark {
+  background-color: #08150e;
+  background-image: 
+    radial-gradient(at 0% 0%, rgba(45, 106, 79, 0.18) 0px, transparent 50%),
+    radial-gradient(at 100% 0%, rgba(82, 183, 136, 0.12) 0px, transparent 50%),
+    radial-gradient(at 50% 100%, rgba(13, 43, 27, 0.3) 0px, transparent 50%);
+}
+
+.bg-mesh-light {
+  background-color: #f4f7f5;
+  background-image: 
+    radial-gradient(at 0% 0%, rgba(82, 183, 136, 0.08) 0px, transparent 50%),
+    radial-gradient(at 100% 0%, rgba(216, 243, 220, 0.25) 0px, transparent 50%);
+}
+
+/* Botanical Card & Modern Aesthetic Utilities */
+.glass-panel {
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid #e3eae5;
+}
+
+.dark .glass-panel {
+  background: rgba(14, 32, 22, 0.88);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(26, 53, 37, 0.9);
+}
+
+.glass-card {
+  background: #ffffff;
+  border: 1px solid #e3eae5;
+  box-shadow: 0 2px 8px -2px rgba(10, 34, 21, 0.04), 0 1px 4px -1px rgba(10, 34, 21, 0.02);
+  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.dark .glass-card {
+  background: #0e2016;
+  border: 1px solid #1a3525;
+  box-shadow: 0 4px 20px -5px rgba(0, 0, 0, 0.3);
+}
+
+.glass-card:hover {
+  transform: translateY(-2px);
+  border-color: #b7d5c3;
+  box-shadow: 0 12px 28px -8px rgba(10, 34, 21, 0.08);
+}
+
+.dark .glass-card:hover {
+  border-color: #2d6a4f;
+  box-shadow: 0 12px 28px -8px rgba(0, 0, 0, 0.5);
+}
+
+.gradient-text {
+  background: linear-gradient(135deg, #143d28 0%, #2d6a4f 50%, #52b788 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.dark .gradient-text {
+  background: linear-gradient(135deg, #d8f3dc 0%, #74c69d 50%, #52b788 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.gradient-btn {
+  background: #143d28;
+  color: #ffffff;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.gradient-btn:hover {
+  background: #1a4d33;
+  transform: translateY(-1px);
+  box-shadow: 0 8px 20px -4px rgba(20, 61, 40, 0.35);
+}
+
+.gradient-btn:active {
+  transform: translateY(0);
+}
+
+/* Custom Sleek Scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(156, 163, 175, 0.3);
+  border-radius: 9999px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(156, 163, 175, 0.5);
+}
+
+/* Smooth Pulse Animation for Skeletons */
+@keyframes shimmer {
+  0% { opacity: 0.5; }
+  50% { opacity: 1; }
+  100% { opacity: 0.5; }
+}
+
+.shimmer {
+  animation: shimmer 1.5s infinite ease-in-out;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+

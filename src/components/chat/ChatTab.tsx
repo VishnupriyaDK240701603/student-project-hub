@@ -209,7 +209,7 @@ export const ChatTab: React.FC<ChatTabProps> = ({
           setIsAiThinking(true);
           const queryWithoutTag = content.replace(/@\[ai\]\([^)]+\)|@ai/gi, "").trim();
 
-          askRoomAiAction(roomId, queryWithoutTag || content).then((aiRes) => {
+          void askRoomAiAction(roomId, queryWithoutTag || content).then((aiRes) => {
             setIsAiThinking(false);
             if (aiRes.success && aiRes.data) {
               const aiMsg: MessageWithSender = {
@@ -248,7 +248,23 @@ export const ChatTab: React.FC<ChatTabProps> = ({
               };
               setMessages((prev) => [...prev, aiErrMsg]);
             }
-          });
+          }).catch(() => {
+            const aiErrMsg: MessageWithSender = {
+              id: `ai-err-${Date.now()}`,
+              room_id: roomId,
+              sender_id: "ai-assistant",
+              content: "The AI assistant could not complete that request. Please try again.",
+              reply_to_id: res.data?.message?.id || null,
+              is_edited: false,
+              is_deleted: false,
+              created_at: new Date().toISOString(),
+              updated_at: new Date().toISOString(),
+              profiles: { display_name: "AI Project Assistant", department: "Assistant" },
+              reactions: [],
+              mentions: [],
+            };
+            setMessages((prev) => [...prev, aiErrMsg]);
+          }).finally(() => setIsAiThinking(false));
         }
       }
       return res;
@@ -320,7 +336,7 @@ export const ChatTab: React.FC<ChatTabProps> = ({
   }
 
   return (
-    <div className="flex flex-col h-[calc(100vh-280px)] min-h-[400px] border rounded-xl bg-card/30 overflow-hidden">
+    <div className="flex flex-col h-[calc(100vh-280px)] min-h-[400px] border border-border rounded-2xl bg-card/60 backdrop-blur-md overflow-hidden shadow-sm">
       {/* Messages area */}
       <div
         ref={scrollContainerRef}
@@ -332,7 +348,7 @@ export const ChatTab: React.FC<ChatTabProps> = ({
             <button
               onClick={loadMore}
               disabled={loadingMore}
-              className="text-xs text-accent hover:text-accent/80 transition-colors disabled:opacity-50"
+              className="text-xs font-semibold text-accent hover:underline transition-colors disabled:opacity-50"
             >
               {loadingMore ? "Loading..." : "↑ Load older messages"}
             </button>
@@ -341,13 +357,13 @@ export const ChatTab: React.FC<ChatTabProps> = ({
 
         {messages.length === 0 && !loading && (
           <div className="flex flex-col items-center justify-center h-full text-center space-y-3 py-12">
-            <div className="w-14 h-14 rounded-full bg-accent/10 flex items-center justify-center">
-              <svg className="w-7 h-7 text-accent" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <div className="w-14 h-14 rounded-full bg-accent/10 flex items-center justify-center text-accent">
+              <svg className="w-7 h-7" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
               </svg>
             </div>
             <div>
-              <h3 className="text-sm font-semibold text-foreground">No messages yet</h3>
+              <h3 className="text-sm font-bold text-foreground">No messages yet</h3>
               <p className="text-xs text-muted-foreground mt-1">
                 Be the first to say something! Use @mentions or type @ai to brainstorm.
               </p>
@@ -381,9 +397,9 @@ export const ChatTab: React.FC<ChatTabProps> = ({
 
         {/* AI Thinking Bubble */}
         {isAiThinking && (
-          <div className="flex items-center gap-2 p-3 bg-accent/5 border border-accent/20 rounded-xl max-w-xs text-xs text-accent animate-pulse">
+          <div className="flex items-center gap-2 p-3 bg-accent/10 border border-accent/20 rounded-xl max-w-xs text-xs text-foreground animate-pulse">
             <span className="w-2 h-2 rounded-full bg-accent animate-bounce" />
-            <span>AI Assistant is analyzing and typing...</span>
+            <span className="font-medium">AI Assistant is analyzing and typing...</span>
           </div>
         )}
 
@@ -405,9 +421,9 @@ export const ChatTab: React.FC<ChatTabProps> = ({
 
       {/* Reply / Edit banner */}
       {(replyTo || editingMessage) && (
-        <div className="px-4 py-2 bg-accent/5 border-t border-accent/20 flex items-center gap-2">
+        <div className="px-4 py-2 bg-muted/70 border-t border-border flex items-center gap-2">
           <div className="flex-1 min-w-0">
-            <span className="text-xs font-medium text-accent">
+            <span className="text-xs font-semibold text-accent">
               {editingMessage ? "Editing message" : `Replying to ${replyTo?.profiles?.display_name || "message"}`}
             </span>
             <p className="text-xs text-muted-foreground truncate">

@@ -30,18 +30,18 @@ export default async function RoomPage({ params, searchParams }: RoomPageProps) 
     redirect(`/login?redirectTo=/rooms/${id}`);
   }
 
-  // Fetch user profile
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("display_name, department, kind")
-    .eq("id", user.id)
-    .single();
-
-  const [roomRes, eventsRes, transferRes] = await Promise.all([
+  const [profileRes, roomRes, eventsRes, transferRes] = await Promise.all([
+    supabase
+      .from("profiles")
+      .select("display_name, department, kind")
+      .eq("id", user.id)
+      .maybeSingle(),
     getRoomDetailsAction(id),
     getRoomEventsAction(id),
     getPendingLeadSwapAction(id),
   ]);
+
+  const profile = profileRes.data;
 
   // Check if room was fetched and user is an active member or mentor
   if (!roomRes.success || !roomRes.data) {

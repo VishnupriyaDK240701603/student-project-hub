@@ -199,7 +199,7 @@ export const MilestonesSection: React.FC<MilestonesSectionProps> = ({
               type="date"
               value={dueDate}
               onChange={(e) => setDueDate(e.target.value)}
-              className="w-full bg-muted/70 border border-border rounded-lg px-3 py-2 text-sm text-foreground focus:ring-1 focus:ring-accent focus:outline-none"
+              className="w-full bg-background border border-border rounded-lg px-3 py-2 text-sm text-foreground focus:ring-2 focus:ring-accent focus:outline-none [color-scheme:light] dark:[color-scheme:dark]"
               required
             />
           </div>

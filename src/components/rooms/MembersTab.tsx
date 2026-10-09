@@ -156,10 +156,10 @@ export const MembersTab: React.FC<MembersTabProps> = ({
 
       {/* Pending Lead Transfer Banner */}
       {pendingTransfer && (
-        <div className="p-4 rounded-xl border border-indigo-500/30 bg-indigo-500/10">
+        <div className="p-4 rounded-xl border border-accent/30 bg-accent/10">
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
             <div>
-              <p className="text-sm font-semibold text-indigo-900 dark:text-indigo-200">
+              <p className="text-sm font-bold text-foreground">
                 Leadership Transfer Pending
               </p>
               <p className="text-xs text-muted-foreground mt-0.5">
@@ -224,7 +224,7 @@ export const MembersTab: React.FC<MembersTabProps> = ({
                   <Avatar name={profile?.display_name || "User"} size="md" />
                   <div className="min-w-0">
                     <div className="flex items-center gap-2">
-                      <span className="font-medium text-foreground text-sm truncate">
+                      <span className="font-semibold text-foreground text-sm truncate">
                         {profile?.display_name || "Team Member"}
                       </span>
                       {isSelf && (
@@ -250,8 +250,8 @@ export const MembersTab: React.FC<MembersTabProps> = ({
                 <div className="flex flex-wrap items-center gap-4 text-xs">
                   {/* Permissions Toggles (Lead configuring student members) */}
                   {isCurrentLead && !isLead && member.role !== "mentor" ? (
-                    <div className="flex flex-wrap items-center gap-3 bg-muted/30 p-2 rounded-lg border border-border/50">
-                      <label className="flex items-center gap-1.5 cursor-pointer">
+                    <div className="flex flex-wrap items-center gap-3 bg-muted/60 p-2 rounded-lg border border-border text-foreground">
+                      <label className="flex items-center gap-1.5 cursor-pointer font-medium">
                         <input
                           type="checkbox"
                           checked={member.can_edit_tasks}
@@ -263,11 +263,11 @@ export const MembersTab: React.FC<MembersTabProps> = ({
                               member.can_edit_tasks,
                             )
                           }
-                          className="rounded border-input text-primary focus:ring-accent"
+                          className="rounded border-border text-accent focus:ring-accent"
                         />
                         <span>Tasks</span>
                       </label>
-                      <label className="flex items-center gap-1.5 cursor-pointer">
+                      <label className="flex items-center gap-1.5 cursor-pointer font-medium">
                         <input
                           type="checkbox"
                           checked={member.can_set_deadlines}
@@ -279,11 +279,11 @@ export const MembersTab: React.FC<MembersTabProps> = ({
                               member.can_set_deadlines,
                             )
                           }
-                          className="rounded border-input text-primary focus:ring-accent"
+                          className="rounded border-border text-accent focus:ring-accent"
                         />
                         <span>Deadlines</span>
                       </label>
-                      <label className="flex items-center gap-1.5 cursor-pointer">
+                      <label className="flex items-center gap-1.5 cursor-pointer font-medium">
                         <input
                           type="checkbox"
                           checked={member.can_invite_mentors}
@@ -295,7 +295,7 @@ export const MembersTab: React.FC<MembersTabProps> = ({
                               member.can_invite_mentors,
                             )
                           }
-                          className="rounded border-input text-primary focus:ring-accent"
+                          className="rounded border-border text-accent focus:ring-accent"
                         />
                         <span>Re-add / Mentors</span>
                       </label>

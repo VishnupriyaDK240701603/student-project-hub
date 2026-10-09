@@ -68,19 +68,19 @@ export const TaskCard: React.FC<TaskCardProps> = ({
               onStatusChange(task.id, e.target.value as TaskStatusEnum);
             }}
             onClick={(e) => e.stopPropagation()}
-            className="text-[11px] font-medium bg-muted/60 hover:bg-muted border border-border rounded px-1.5 py-0.5 text-muted-foreground focus:outline-none focus:ring-1 focus:ring-accent"
+            className="text-[11px] font-semibold bg-muted hover:bg-muted/80 border border-border rounded px-1.5 py-0.5 text-foreground focus:outline-none focus:ring-1 focus:ring-accent cursor-pointer"
             aria-label={`Change status for ${task.title}`}
           >
-            <option value="todo">To do</option>
-            <option value="in_progress">In progress</option>
-            <option value="done">Done</option>
+            <option value="todo" className="bg-card text-foreground">To do</option>
+            <option value="in_progress" className="bg-card text-foreground">In progress</option>
+            <option value="done" className="bg-card text-foreground">Done</option>
           </select>
         )}
       </div>
 
       {/* Description preview if present */}
       {task.description && (
-        <p className="text-xs text-muted-foreground line-clamp-2">
+        <p className="text-xs text-muted-foreground line-clamp-2 leading-relaxed">
           {task.description}
         </p>
       )}
@@ -107,7 +107,7 @@ export const TaskCard: React.FC<TaskCardProps> = ({
 
         {/* Subtask count */}
         {totalSubtasks > 0 && (
-          <span className="inline-flex items-center gap-1 text-[11px] bg-muted/50 px-1.5 py-0.5 rounded text-muted-foreground font-mono">
+          <span className="inline-flex items-center gap-1 text-[11px] bg-muted px-1.5 py-0.5 rounded text-foreground font-mono">
             <svg className="w-3 h-3 text-muted-foreground" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
             </svg>
@@ -135,12 +135,12 @@ export const TaskCard: React.FC<TaskCardProps> = ({
                 key={assignee.user_id}
                 name={assignee.profiles?.display_name || "Member"}
                 size="sm"
-                className="ring-2 ring-background text-[10px]"
+                className="ring-2 ring-card text-[10px]"
               />
             ))}
           </div>
           {isAssignee && (
-            <span className="text-[10px] font-medium text-accent">Assigned to you</span>
+            <span className="text-[10px] font-semibold text-accent">Assigned to you</span>
           )}
         </div>
       )}

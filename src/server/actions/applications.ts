@@ -169,12 +169,33 @@ export async function submitApplication(
     const storagePath = generateSecureStoragePath(application.id, input.file.name);
 
     // Upload to private Supabase storage bucket
-    const { error: uploadError } = await supabase.storage
+    let { error: uploadError } = await supabase.storage
       .from("application-files")
       .upload(storagePath, fileBuffer, {
         contentType: input.file.type,
         upsert: false,
       });
+
+    // Auto-create bucket if missing in Supabase Storage and retry
+    if (
+      uploadError &&
+      (uploadError.message?.toLowerCase().includes("bucket not found") ||
+        (uploadError as unknown as { statusCode?: string }).statusCode === "404")
+    ) {
+      await supabase.storage.createBucket("application-files", {
+        public: false,
+        fileSizeLimit: 10485760, // 10MB
+      });
+
+      const retryResult = await supabase.storage
+        .from("application-files")
+        .upload(storagePath, fileBuffer, {
+          contentType: input.file.type,
+          upsert: true,
+        });
+
+      uploadError = retryResult.error;
+    }
 
     if (uploadError) {
       // Rollback application record if upload fails
@@ -187,14 +208,23 @@ export async function submitApplication(
       .from("application_files")
       .insert({
         application_id: application.id,
+        uploader_id: user.id,
         storage_path: storagePath,
-        file_type: input.file.type,
+        file_name: input.file.name,
         file_size_bytes: input.file.size,
+        mime_type: input.file.type || "application/octet-stream",
       })
       .select()
       .single();
 
-    if (!fileDbError && dbFile) {
+    if (fileDbError) {
+      // Rollback application and storage file if DB metadata insertion fails
+      await supabase.storage.from("application-files").remove([storagePath]);
+      await supabase.from("applications").delete().eq("id", application.id);
+      return { success: false, error: `Failed to save file metadata: ${fileDbError.message}` };
+    }
+
+    if (dbFile) {
       fileRecord = dbFile as ApplicationFile;
     }
   }
@@ -311,42 +341,109 @@ export async function getApplicationsForRequest(
 }
 
 /**
- * Generate a short-lived signed download URL (300 seconds) for an application file.
- * Forces download header to prevent inline execution of user uploads.
+ * Generate a short-lived signed URL for viewing or downloading an application file.
  */
 export async function getSecureFileDownloadUrl(
   fileId: string,
-): Promise<ActionResult<{ downloadUrl: string }>> {
+  download: boolean = false,
+): Promise<ActionResult<{ downloadUrl: string; fileName?: string; mimeType?: string }>> {
   const supabase = await createServerSupabaseClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
 
   if (!user) {
-    return { success: false, error: "Unauthorized" };
+    return { success: false, error: "Unauthorized: Please sign in." };
   }
 
-  // Verify caller has permission to view this file via database RLS query
+  // Fetch file record
   const { data: fileRecord, error: fileError } = await supabase
     .from("application_files")
-    .select("id, storage_path, application_id")
+    .select("id, storage_path, application_id, file_name, mime_type")
     .eq("id", fileId)
-    .single();
+    .maybeSingle();
 
   if (fileError || !fileRecord) {
-    return { success: false, error: "File not found or access denied." };
+    return { success: false, error: "File record not found or access denied." };
   }
 
-  // Generate 5-minute signed URL with download flag forced
-  const { data, error: signError } = await supabase.storage
+  const downloadParam = download ? (fileRecord.file_name || true) : false;
+
+  // 1. Try application-files bucket
+  let { data: signData, error: signError } = await supabase.storage
     .from("application-files")
-    .createSignedUrl(fileRecord.storage_path, 300, {
-      download: true, // Forces Content-Disposition: attachment
+    .createSignedUrl(fileRecord.storage_path, 3600, {
+      download: downloadParam,
     });
 
-  if (signError || !data?.signedUrl) {
-    return { success: false, error: "Failed to generate secure download link." };
+  // 2. Fallback to resumes bucket if missing
+  if (signError || !signData?.signedUrl) {
+    const retry = await supabase.storage
+      .from("resumes")
+      .createSignedUrl(fileRecord.storage_path, 3600, {
+        download: downloadParam,
+      });
+    signData = retry.data;
+    signError = retry.error;
   }
 
-  return { success: true, data: { downloadUrl: data.signedUrl } };
+  if (signError || !signData?.signedUrl) {
+    return { success: false, error: signError?.message || "Failed to generate file link." };
+  }
+
+  return {
+    success: true,
+    data: {
+      downloadUrl: signData.signedUrl,
+      fileName: fileRecord.file_name || undefined,
+      mimeType: fileRecord.mime_type || undefined,
+    },
+  };
 }
+
+export interface MyApplicationItem extends Application {
+  team_requests: {
+    id: string;
+    title: string;
+    description: string;
+    role_needed: string;
+    department: string;
+    headcount: number;
+    status: string;
+    room_id: string | null;
+    lead_id: string;
+    profiles?: {
+      display_name: string;
+      department: string;
+      admission_year: number | null;
+    } | null;
+  } | null;
+  application_files: ApplicationFile[];
+}
+
+/**
+ * Fetch all applications submitted by the current authenticated user
+ */
+export async function getMyApplicationsAction(): Promise<ActionResult<MyApplicationItem[]>> {
+  const supabase = await createServerSupabaseClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    return { success: false, error: "Unauthorized: Please sign in." };
+  }
+
+  const { data, error } = await supabase
+    .from("applications")
+    .select("*, team_requests(*, profiles:lead_id(display_name, department, admission_year)), application_files(*)")
+    .eq("applicant_id", user.id)
+    .order("created_at", { ascending: false });
+
+  if (error) {
+    return { success: false, error: error.message };
+  }
+
+  return { success: true, data: (data || []) as unknown as MyApplicationItem[] };
+}
+

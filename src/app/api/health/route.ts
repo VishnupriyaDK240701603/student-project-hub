@@ -34,8 +34,8 @@ export async function GET() {
   }
 
   const aiEnabled = process.env.AI_ENABLED === "true";
-  const hasHfToken = Boolean(process.env.HF_TOKEN);
-  const aiStatus = aiEnabled && hasHfToken ? "configured" : aiEnabled ? "unconfigured" : "disabled";
+  const hasAiProvider = Boolean(process.env.HF_TOKEN || process.env.GROQ_API_KEY);
+  const aiStatus = aiEnabled && hasAiProvider ? "configured" : aiEnabled ? "unconfigured" : "disabled";
 
   const overallStatus = dbStatus === "connected" ? "healthy" : "degraded";
 

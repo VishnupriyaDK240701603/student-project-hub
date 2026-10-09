@@ -45,16 +45,16 @@ export const LeaveRoomModal: React.FC<LeaveRoomModalProps> = ({
     <Dialog isOpen={isOpen} onClose={onClose} title="Leave Project Room">
       <div className="space-y-4">
         {cannotLeaveAsLead ? (
-          <div className="rounded-lg bg-amber-500/10 border border-amber-500/20 p-3 text-sm text-amber-800 dark:text-amber-200">
-            <p className="font-medium">Lead Handover Required</p>
-            <p className="mt-1 text-xs">
+          <div className="rounded-xl bg-amber-500/10 border border-amber-500/30 p-3.5 text-sm text-amber-950 dark:text-amber-200">
+            <p className="font-bold">Lead Handover Required</p>
+            <p className="mt-1 text-xs text-amber-900 dark:text-amber-300 leading-relaxed">
               You are currently the team lead and other active members remain. Please transfer leadership in the Members tab before leaving.
             </p>
           </div>
         ) : (
-          <div className="rounded-lg bg-destructive/10 border border-destructive/20 p-3 text-sm text-destructive">
-            <p className="font-medium">Leave Room (&ldquo;Delete Room&rdquo;)</p>
-            <p className="mt-1 text-xs">
+          <div className="rounded-xl bg-destructive/10 border border-destructive/30 p-3.5 text-sm text-destructive">
+            <p className="font-bold">Leave Room (&ldquo;Delete Room&rdquo;)</p>
+            <p className="mt-1 text-xs text-destructive/90 dark:text-destructive leading-relaxed">
               Your access to this room, task board, and realtime discussions will end immediately. The team room will continue for other teammates. Your existing messages and files will remain attributed to you.
             </p>
           </div>

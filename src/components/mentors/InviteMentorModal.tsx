@@ -104,9 +104,9 @@ export const InviteMentorModal: React.FC<InviteMentorModalProps> = ({
   return (
     <Dialog isOpen={isOpen} onClose={onClose} title={`Invite Faculty Mentor to ${projectTitle}`}>
       <form onSubmit={handleSubmit} className="space-y-4">
-        <div className="rounded-lg bg-indigo-500/10 border border-indigo-500/20 p-3 text-xs text-indigo-900 dark:text-indigo-200">
-          <p className="font-semibold">Faculty Mentor Role (Spec F12, Invariant 4)</p>
-          <p className="mt-1 text-muted-foreground">
+        <div className="rounded-xl bg-accent/10 border border-accent/20 p-3.5 text-xs">
+          <p className="font-bold text-foreground">Faculty Mentor Role (Spec F12, Invariant 4)</p>
+          <p className="mt-1 text-muted-foreground leading-relaxed">
             Mentors have advisory access with chat and dashboard progress view. Mentors do NOT count toward student headcount and cannot become team lead. Staff can have at most 10 pending invitations.
           </p>
         </div>
@@ -195,14 +195,14 @@ export const InviteMentorModal: React.FC<InviteMentorModalProps> = ({
 
         {/* Selected Staff Banner */}
         {selectedStaff && (
-          <div className="p-2.5 rounded-md bg-emerald-500/10 border border-emerald-500/20 text-xs flex items-center justify-between">
-            <span className="text-emerald-800 dark:text-emerald-200">
-              Selected: <strong>{selectedStaff.display_name}</strong> ({selectedStaff.department})
+          <div className="p-2.5 rounded-lg bg-emerald-500/10 border border-emerald-500/30 text-xs flex items-center justify-between">
+            <span className="text-emerald-950 dark:text-emerald-200">
+              Selected: <strong className="text-foreground">{selectedStaff.display_name}</strong> ({selectedStaff.department})
             </span>
             <button
               type="button"
               onClick={() => setSelectedStaff(null)}
-              className="text-xs text-muted-foreground hover:text-foreground"
+              className="text-xs font-semibold text-accent hover:underline"
             >
               Change
             </button>

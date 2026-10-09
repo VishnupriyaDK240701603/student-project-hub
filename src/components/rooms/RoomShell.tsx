@@ -3,13 +3,15 @@
 import React, { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Badge, Button } from "@/components/ui";
+import { Badge, Button, useToast } from "@/components/ui";
+import { DeleteProjectConfirmation } from "@/components/rooms/DeleteProjectConfirmation";
 import { MembersTab } from "./MembersTab";
 import { LeaveRoomModal } from "./LeaveRoomModal";
 import { ChatTab } from "@/components/chat/ChatTab";
 import { FilesTab } from "@/components/chat/FilesTab";
 import { TaskBoardTab, ProgressDashboardTab, MilestonesSection, MeetingsSection } from "@/components/tasks";
 import { leaveRoomAction, type RoomEventWithActor } from "@/server/actions/room-management";
+import { deleteProjectRoomAction } from "@/server/actions/rooms";
 import { getMilestonesAction, getMeetingsAction, type MeetingWithCreator } from "@/server/actions/tasks";
 import type { Room, TeamRequest, RoomMember, Profile, LeadTransfer, Milestone } from "@/types/database.types";
 
@@ -36,8 +38,10 @@ export const RoomShell: React.FC<RoomShellProps> = ({
   onRefresh,
 }) => {
   const router = useRouter();
+  const { showToast } = useToast();
   const [activeTab, setActiveTab] = useState<RoomTab>(initialTab);
   const [isLeaveModalOpen, setIsLeaveModalOpen] = useState(false);
+  const [isDeletingRoom, setIsDeletingRoom] = useState(false);
 
   const [milestones, setMilestones] = useState<Milestone[]>([]);
   const [meetings, setMeetings] = useState<MeetingWithCreator[]>([]);
@@ -51,6 +55,18 @@ export const RoomShell: React.FC<RoomShellProps> = ({
   const isMentor = currentMember?.role === "mentor";
   const canEditTaskBoard = isLead || !!currentMember?.can_edit_tasks;
   const canSetDeadlines = isLead || !!currentMember?.can_set_deadlines;
+
+  const handleDeleteRoom = async () => {
+    setIsDeletingRoom(true);
+    const result = await deleteProjectRoomAction(room.id);
+    setIsDeletingRoom(false);
+    if (result.success) {
+      showToast({ type: "success", title: "Project room deleted", description: "The room and its project data have been permanently removed." });
+      router.push("/rooms");
+    } else {
+      showToast({ type: "error", title: "Could not delete room", description: result.error || "Please try again." });
+    }
+  };
 
   const loadMilestonesAndMeetings = React.useCallback(async () => {
     const [mRes, meetRes] = await Promise.all([
@@ -101,6 +117,14 @@ export const RoomShell: React.FC<RoomShellProps> = ({
         </div>
 
         <div className="flex items-center gap-2">
+          {isLead && (
+            <DeleteProjectConfirmation
+              itemName={title}
+              itemType="project room"
+              isDeleting={isDeletingRoom}
+              onConfirm={handleDeleteRoom}
+            />
+          )}
           <Button
             size="sm"
             variant="danger"

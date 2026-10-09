@@ -48,16 +48,16 @@ export const RemoveMemberModal: React.FC<RemoveMemberModalProps> = ({
   return (
     <Dialog isOpen={isOpen} onClose={onClose} title={`Remove Member: ${memberName}`}>
       <form onSubmit={handleSubmit} className="space-y-4">
-        <div className="rounded-lg bg-amber-500/10 border border-amber-500/20 p-3 text-sm text-amber-800 dark:text-amber-200">
-          <p className="font-medium">Accountable Member Removal (Invariant 8)</p>
-          <p className="mt-1 text-xs text-muted-foreground">
+        <div className="rounded-xl bg-amber-500/10 border border-amber-500/30 p-3.5 text-sm text-amber-950 dark:text-amber-200">
+          <p className="font-bold">Accountable Member Removal (Invariant 8)</p>
+          <p className="mt-1 text-xs text-amber-900 dark:text-amber-300 leading-relaxed">
             A written reason is required and will be permanently recorded in the room event feed visible to all teammates. The member will lose access immediately.
           </p>
         </div>
 
         <div>
-          <label htmlFor="removal-reason" className="block text-sm font-medium mb-1">
-            Reason for Removal <span className="text-red-500">*</span>
+          <label htmlFor="removal-reason" className="block text-sm font-semibold text-foreground mb-1">
+            Reason for Removal <span className="text-destructive">*</span>
           </label>
           <textarea
             id="removal-reason"
@@ -65,7 +65,7 @@ export const RemoveMemberModal: React.FC<RemoveMemberModalProps> = ({
             value={reason}
             onChange={(e) => setReason(e.target.value)}
             placeholder="Explain specifically why this member is being removed from the project team (minimum 10 characters)..."
-            className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-accent"
+            className="w-full rounded-lg border border-input bg-background text-foreground px-3 py-2 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-accent placeholder:text-muted-foreground"
             disabled={submitting}
             required
           />

@@ -202,7 +202,7 @@ CREATE POLICY room_files_select_members ON room_files
   FOR SELECT USING (is_room_member(room_id, auth.uid()) OR is_active_mentor(room_id, auth.uid()));
 
 CREATE POLICY room_files_insert_members ON room_files
-  FOR INSERT WITH CHECK (is_room_member(room_id, auth.uid()) AND uploader_id = auth.uid());
+  FOR INSERT WITH CHECK (is_room_member(room_id, auth.uid()) AND uploaded_by = auth.uid());
 
 -- Notifications Policies
 CREATE POLICY notifications_select_own ON notifications

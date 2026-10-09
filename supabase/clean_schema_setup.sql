@@ -81,6 +81,11 @@ CREATE TABLE team_requests (
   headcount INT NOT NULL CHECK (headcount > 0),
   department TEXT NOT NULL,
   required_skills TEXT[] NOT NULL DEFAULT '{}',
+  tags TEXT[] NOT NULL DEFAULT '{}',
+  filter_years INT[] NOT NULL DEFAULT '{}',
+  filter_departments TEXT[] NOT NULL DEFAULT '{}',
+  filter_genders gender_enum[] NOT NULL DEFAULT '{}',
+  resume_required BOOLEAN NOT NULL DEFAULT FALSE,
   min_capacity INT NOT NULL DEFAULT 1,
   max_capacity INT NOT NULL DEFAULT 6,
   room_id UUID,
@@ -93,8 +98,10 @@ CREATE TABLE team_requests (
 CREATE TABLE rooms (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   initial_request_id UUID REFERENCES team_requests(id) ON DELETE SET NULL,
+  lead_id UUID NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
   name TEXT NOT NULL,
-  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
 ALTER TABLE team_requests ADD CONSTRAINT fk_team_requests_room FOREIGN KEY (room_id) REFERENCES rooms(id) ON DELETE SET NULL;
@@ -110,9 +117,20 @@ CREATE TABLE room_members (
   can_set_deadlines BOOLEAN NOT NULL DEFAULT FALSE,
   can_invite_mentors BOOLEAN NOT NULL DEFAULT FALSE,
   can_readd_members BOOLEAN NOT NULL DEFAULT FALSE,
+  removed_reason TEXT,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   UNIQUE(room_id, user_id)
+);
+
+-- Room Events (Activity feed per room)
+CREATE TABLE room_events (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  room_id UUID NOT NULL REFERENCES rooms(id) ON DELETE CASCADE,
+  actor_id UUID REFERENCES profiles(id) ON DELETE SET NULL,
+  event_type TEXT NOT NULL,
+  metadata JSONB NOT NULL DEFAULT '{}'::jsonb,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
 -- Applications
@@ -122,6 +140,7 @@ CREATE TABLE applications (
   applicant_id UUID NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
   status application_status_enum NOT NULL DEFAULT 'applied',
   note TEXT,
+  expires_at TIMESTAMPTZ,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   UNIQUE(request_id, applicant_id)
@@ -263,11 +282,11 @@ CREATE TABLE meetings (
 CREATE TABLE room_files (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   room_id UUID NOT NULL REFERENCES rooms(id) ON DELETE CASCADE,
-  uploader_id UUID NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
+  uploaded_by UUID NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
   storage_path TEXT NOT NULL,
   file_name TEXT NOT NULL,
+  file_type TEXT NOT NULL,
   file_size_bytes INT NOT NULL,
-  mime_type TEXT NOT NULL,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
@@ -278,7 +297,7 @@ CREATE TABLE notifications (
   type TEXT NOT NULL,
   title TEXT NOT NULL,
   body TEXT NOT NULL,
-  action_url TEXT,
+  link TEXT,
   is_read BOOLEAN NOT NULL DEFAULT FALSE,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
@@ -360,6 +379,7 @@ ALTER TABLE app_roles ENABLE ROW LEVEL SECURITY;
 ALTER TABLE team_requests ENABLE ROW LEVEL SECURITY;
 ALTER TABLE rooms ENABLE ROW LEVEL SECURITY;
 ALTER TABLE room_members ENABLE ROW LEVEL SECURITY;
+ALTER TABLE room_events ENABLE ROW LEVEL SECURITY;
 ALTER TABLE applications ENABLE ROW LEVEL SECURITY;
 ALTER TABLE application_files ENABLE ROW LEVEL SECURITY;
 ALTER TABLE lead_transfers ENABLE ROW LEVEL SECURITY;
@@ -476,13 +496,28 @@ CREATE POLICY requests_insert_auth ON team_requests FOR INSERT WITH CHECK (auth.
 CREATE POLICY requests_update_lead ON team_requests FOR UPDATE USING (lead_id = auth.uid());
 
 -- Rooms & Members
-CREATE POLICY rooms_select_members ON rooms FOR SELECT USING (is_room_member(id, auth.uid()) OR is_active_mentor(id, auth.uid()));
-CREATE POLICY room_members_select ON room_members FOR SELECT USING (is_room_member(room_id, auth.uid()) OR user_id = auth.uid());
+CREATE POLICY rooms_select_members ON rooms FOR SELECT USING (lead_id = auth.uid() OR is_room_member(id, auth.uid()) OR is_active_mentor(id, auth.uid()));
+CREATE POLICY rooms_insert_auth ON rooms FOR INSERT WITH CHECK (auth.uid() IS NOT NULL);
+CREATE POLICY rooms_update_lead ON rooms FOR UPDATE USING (lead_id = auth.uid());
+CREATE POLICY room_members_select ON room_members FOR SELECT USING (user_id = auth.uid() OR is_room_member(room_id, auth.uid()) OR EXISTS (SELECT 1 FROM rooms r WHERE r.id = room_members.room_id AND r.lead_id = auth.uid()) OR is_active_mentor(room_id, auth.uid()));
+CREATE POLICY room_members_insert ON room_members FOR INSERT WITH CHECK (auth.uid() IS NOT NULL);
+CREATE POLICY room_members_update ON room_members FOR UPDATE USING (user_id = auth.uid() OR is_room_member(room_id, auth.uid()) OR EXISTS (SELECT 1 FROM rooms r WHERE r.id = room_members.room_id AND r.lead_id = auth.uid()));
+
+-- Room Events
+CREATE POLICY room_events_select ON room_events FOR SELECT USING (is_room_member(room_id, auth.uid()) OR is_active_mentor(room_id, auth.uid()));
+CREATE POLICY room_events_insert ON room_events FOR INSERT WITH CHECK (auth.uid() IS NOT NULL);
 
 -- Applications
 CREATE POLICY applications_select_involved ON applications FOR SELECT USING (applicant_id = auth.uid() OR is_request_lead(request_id, auth.uid()));
 CREATE POLICY applications_insert_own ON applications FOR INSERT WITH CHECK (applicant_id = auth.uid());
 CREATE POLICY applications_update_involved ON applications FOR UPDATE USING (applicant_id = auth.uid() OR is_request_lead(request_id, auth.uid()));
+
+-- Application Files (Resumes / Portfolios)
+CREATE POLICY application_files_select ON application_files FOR SELECT USING (uploader_id = auth.uid() OR EXISTS (SELECT 1 FROM applications a JOIN team_requests tr ON tr.id = a.request_id WHERE a.id = application_files.application_id AND (a.applicant_id = auth.uid() OR tr.lead_id = auth.uid())));
+CREATE POLICY application_files_insert ON application_files FOR INSERT WITH CHECK (auth.uid() IS NOT NULL AND auth.uid() = uploader_id);
+CREATE POLICY application_files_update ON application_files FOR UPDATE USING (uploader_id = auth.uid());
+CREATE POLICY application_files_delete ON application_files FOR DELETE USING (uploader_id = auth.uid() OR EXISTS (SELECT 1 FROM applications a JOIN team_requests tr ON tr.id = a.request_id WHERE a.id = application_files.application_id AND (a.applicant_id = auth.uid() OR tr.lead_id = auth.uid())));
+
 
 -- Messages
 CREATE POLICY messages_select_members ON messages FOR SELECT USING (is_room_member(room_id, auth.uid()) OR is_active_mentor(room_id, auth.uid()));
@@ -493,10 +528,47 @@ CREATE POLICY messages_update_own ON messages FOR UPDATE USING (sender_id = auth
 CREATE POLICY tasks_select_members ON tasks FOR SELECT USING (is_room_member(room_id, auth.uid()) OR is_active_mentor(room_id, auth.uid()));
 CREATE POLICY tasks_insert_members ON tasks FOR INSERT WITH CHECK (is_room_member(room_id, auth.uid()));
 CREATE POLICY tasks_update_members ON tasks FOR UPDATE USING (is_room_member(room_id, auth.uid()));
+CREATE POLICY tasks_delete_members ON tasks FOR DELETE USING (is_room_member(room_id, auth.uid()));
+
+-- Milestones
+CREATE POLICY milestones_select_room_members ON milestones FOR SELECT USING (is_room_member(room_id, auth.uid()) OR is_active_mentor(room_id, auth.uid()));
+CREATE POLICY milestones_insert_room_members ON milestones FOR INSERT WITH CHECK (is_room_member(room_id, auth.uid()));
+CREATE POLICY milestones_update_room_members ON milestones FOR UPDATE USING (is_room_member(room_id, auth.uid()));
+CREATE POLICY milestones_delete_room_members ON milestones FOR DELETE USING (is_room_member(room_id, auth.uid()));
+
+-- Meetings
+CREATE POLICY meetings_select_room_members ON meetings FOR SELECT USING (is_room_member(room_id, auth.uid()));
+CREATE POLICY meetings_insert_room_members ON meetings FOR INSERT WITH CHECK (is_room_member(room_id, auth.uid()) AND created_by = auth.uid());
+CREATE POLICY meetings_delete_creator_or_lead ON meetings FOR DELETE USING (
+  is_room_member(room_id, auth.uid())
+  AND (
+    created_by = auth.uid()
+    OR EXISTS (
+      SELECT 1 FROM room_members rm
+      WHERE rm.room_id = meetings.room_id
+        AND rm.user_id = auth.uid()
+        AND rm.role = 'lead'
+        AND rm.status = 'active'
+    )
+  )
+);
 
 -- Room Files
 CREATE POLICY room_files_select_members ON room_files FOR SELECT USING (is_room_member(room_id, auth.uid()) OR is_active_mentor(room_id, auth.uid()));
-CREATE POLICY room_files_insert_members ON room_files FOR INSERT WITH CHECK (is_room_member(room_id, auth.uid()) AND uploader_id = auth.uid());
+CREATE POLICY room_files_insert_members ON room_files FOR INSERT WITH CHECK (is_room_member(room_id, auth.uid()) AND uploaded_by = auth.uid());
+CREATE POLICY room_files_delete_members ON room_files FOR DELETE USING (
+  is_room_member(room_id, auth.uid())
+  AND (
+    uploaded_by = auth.uid()
+    OR EXISTS (
+      SELECT 1 FROM room_members rm
+      WHERE rm.room_id = room_files.room_id
+        AND rm.user_id = auth.uid()
+        AND rm.role = 'lead'
+        AND rm.status = 'active'
+    )
+  )
+);
 
 -- Notifications
 CREATE POLICY notifications_select_own ON notifications FOR SELECT USING (user_id = auth.uid());
@@ -528,3 +600,91 @@ CREATE INDEX IF NOT EXISTS idx_applications_request_status ON applications (requ
 CREATE INDEX IF NOT EXISTS idx_notifications_user_unread ON notifications (user_id, is_read, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_reports_status_created ON reports (status, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_audit_log_created ON audit_log (created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_room_events_room_created ON room_events (room_id, created_at DESC);
+
+-- 8. Storage Buckets & Policies
+INSERT INTO storage.buckets (id, name, public, file_size_limit)
+VALUES 
+  ('application-files', 'application-files', false, 10485760),
+  ('resumes', 'resumes', false, 10485760),
+  ('room-files', 'room-files', false, 52428800)
+ON CONFLICT (id) DO UPDATE
+SET 
+  public = false,
+  file_size_limit = EXCLUDED.file_size_limit;
+
+-- Storage Policies for application-files
+DROP POLICY IF EXISTS "Authenticated users can upload application files" ON storage.objects;
+DROP POLICY IF EXISTS "Users can read application files" ON storage.objects;
+DROP POLICY IF EXISTS "Users can delete application files" ON storage.objects;
+
+CREATE POLICY "Authenticated users can upload application files" 
+ON storage.objects FOR INSERT 
+TO authenticated 
+WITH CHECK (bucket_id = 'application-files' AND auth.uid() IS NOT NULL);
+
+CREATE POLICY "Users can read application files" 
+ON storage.objects FOR SELECT 
+TO authenticated 
+USING (
+  bucket_id = 'application-files'
+  AND EXISTS (
+    SELECT 1 FROM public.application_files af
+    JOIN public.applications a ON a.id = af.application_id
+    JOIN public.team_requests tr ON tr.id = a.request_id
+    WHERE af.storage_path = storage.objects.name
+      AND (a.applicant_id = auth.uid() OR tr.lead_id = auth.uid())
+  )
+);
+
+CREATE POLICY "Users can delete application files" 
+ON storage.objects FOR DELETE 
+TO authenticated 
+USING (
+  bucket_id = 'application-files'
+  AND EXISTS (
+    SELECT 1 FROM public.application_files af
+    JOIN public.applications a ON a.id = af.application_id
+    JOIN public.team_requests tr ON tr.id = a.request_id
+    WHERE af.storage_path = storage.objects.name
+      AND (a.applicant_id = auth.uid() OR tr.lead_id = auth.uid())
+  )
+);
+
+-- Storage Policies for resumes
+DROP POLICY IF EXISTS "Authenticated users can upload resumes" ON storage.objects;
+DROP POLICY IF EXISTS "Users can read resumes" ON storage.objects;
+
+CREATE POLICY "Authenticated users can upload resumes" 
+ON storage.objects FOR INSERT 
+TO authenticated 
+WITH CHECK (bucket_id = 'resumes' AND auth.uid() IS NOT NULL);
+
+CREATE POLICY "Users can read resumes" 
+ON storage.objects FOR SELECT 
+TO authenticated 
+USING (
+  bucket_id = 'resumes'
+  AND EXISTS (
+    SELECT 1 FROM public.application_files af
+    JOIN public.applications a ON a.id = af.application_id
+    JOIN public.team_requests tr ON tr.id = a.request_id
+    WHERE af.storage_path = storage.objects.name
+      AND (a.applicant_id = auth.uid() OR tr.lead_id = auth.uid())
+  )
+);
+
+-- Storage Policies for room-files
+DROP POLICY IF EXISTS "Authenticated users can upload room files" ON storage.objects;
+DROP POLICY IF EXISTS "Users can read room files" ON storage.objects;
+
+CREATE POLICY "Authenticated users can upload room files" 
+ON storage.objects FOR INSERT 
+TO authenticated 
+WITH CHECK (bucket_id = 'room-files' AND auth.uid() IS NOT NULL);
+
+CREATE POLICY "Users can read room files" 
+ON storage.objects FOR SELECT 
+TO authenticated 
+USING (bucket_id = 'room-files' AND auth.uid() IS NOT NULL);
+

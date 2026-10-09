@@ -22,7 +22,7 @@ VALUES
     '00000000-0000-0000-0000-000000000000',
     'authenticated',
     'authenticated',
-    'lead.student.22.cse@rajlakshmi.edu.in',
+    'lead.student.22.cse@rajalakshmi.edu.in',
     crypt('password123', gen_salt('bf')),
     NOW(),
     NOW(),
@@ -36,7 +36,7 @@ VALUES
     '00000000-0000-0000-0000-000000000000',
     'authenticated',
     'authenticated',
-    'applicant.student.22.cse@rajlakshmi.edu.in',
+    'applicant.student.22.cse@rajalakshmi.edu.in',
     crypt('password123', gen_salt('bf')),
     NOW(),
     NOW(),
@@ -50,7 +50,7 @@ VALUES
     '00000000-0000-0000-0000-000000000000',
     'authenticated',
     'authenticated',
-    'mentor.staff.cse@rajlakshmi.edu.in',
+    'mentor.staff.cse@rajalakshmi.edu.in',
     crypt('password123', gen_salt('bf')),
     NOW(),
     NOW(),
@@ -64,7 +64,7 @@ VALUES
     '00000000-0000-0000-0000-000000000000',
     'authenticated',
     'authenticated',
-    'moderator.staff.cse@rajlakshmi.edu.in',
+    'moderator.staff.cse@rajalakshmi.edu.in',
     crypt('password123', gen_salt('bf')),
     NOW(),
     NOW(),
@@ -80,7 +80,7 @@ ON CONFLICT (id) DO NOTHING;
 INSERT INTO profiles (id, email, display_name, kind, admission_year, department, gender)
 VALUES (
   '11111111-1111-1111-1111-111111111111',
-  'lead.student.22.cse@rajlakshmi.edu.in',
+  'lead.student.22.cse@rajalakshmi.edu.in',
   'Lead Student',
   'student',
   2022,
@@ -92,7 +92,7 @@ VALUES (
 INSERT INTO profiles (id, email, display_name, kind, admission_year, department, gender)
 VALUES (
   '22222222-2222-2222-2222-222222222222',
-  'applicant.student.22.cse@rajlakshmi.edu.in',
+  'applicant.student.22.cse@rajalakshmi.edu.in',
   'Applicant Student',
   'student',
   2022,
@@ -104,7 +104,7 @@ VALUES (
 INSERT INTO profiles (id, email, display_name, kind, admission_year, department, gender)
 VALUES (
   '33333333-3333-3333-3333-333333333333',
-  'mentor.staff.cse@rajlakshmi.edu.in',
+  'mentor.staff.cse@rajalakshmi.edu.in',
   'Staff Mentor',
   'staff',
   NULL,
@@ -116,7 +116,7 @@ VALUES (
 INSERT INTO profiles (id, email, display_name, kind, admission_year, department, gender)
 VALUES (
   '44444444-4444-4444-4444-444444444444',
-  'moderator.staff.cse@rajlakshmi.edu.in',
+  'moderator.staff.cse@rajalakshmi.edu.in',
   'Staff Moderator',
   'staff',
   NULL,

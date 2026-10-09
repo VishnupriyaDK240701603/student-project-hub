@@ -42,16 +42,16 @@ describe("Prompt 17: Moderation Server Actions & Invariants", () => {
 
   describe("Acceptance Criteria 3: Two-Moderator Rule for Appeals", () => {
     it("rejects appeal decision if deciding moderator is the same as the blocking moderator", () => {
-      const blockingModeratorId = "mod-alice-1";
-      const decidingModeratorId = "mod-alice-1"; // Same moderator!
+      const blockingModeratorId: string = "mod-alice-1";
+      const decidingModeratorId: string = "mod-alice-1"; // Same moderator!
 
       const isEligibleToDecide = decidingModeratorId !== blockingModeratorId;
       expect(isEligibleToDecide).toBe(false);
     });
 
     it("allows appeal decision if deciding moderator is different from the blocking moderator", () => {
-      const blockingModeratorId = "mod-alice-1";
-      const decidingModeratorId = "mod-bob-2"; // Different moderator
+      const blockingModeratorId: string = "mod-alice-1";
+      const decidingModeratorId: string = "mod-bob-2"; // Different moderator
 
       const isEligibleToDecide = decidingModeratorId !== blockingModeratorId;
       expect(isEligibleToDecide).toBe(true);

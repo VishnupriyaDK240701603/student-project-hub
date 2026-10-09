@@ -22,14 +22,17 @@ export default async function RoomsPage() {
     redirect("/login");
   }
 
-  // Fetch user profile
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("display_name, department, kind")
-    .eq("id", user.id)
-    .single();
+  // Fetch user profile and active rooms concurrently
+  const [profileRes, roomsRes] = await Promise.all([
+    supabase
+      .from("profiles")
+      .select("display_name, department, kind")
+      .eq("id", user.id)
+      .maybeSingle(),
+    getMyRoomsAction(),
+  ]);
 
-  const roomsRes = await getMyRoomsAction();
+  const profile = profileRes.data;
   const rooms = roomsRes.success && roomsRes.data ? roomsRes.data : [];
 
   return (

@@ -79,11 +79,11 @@ CREATE TABLE team_requests (
   status request_status_enum NOT NULL DEFAULT 'open',
   role_needed TEXT NOT NULL,
   headcount INT NOT NULL CHECK (headcount > 0),
-  department TEXT NOT NULL,
-  required_skills TEXT[] NOT NULL DEFAULT '{}',
-  min_capacity INT NOT NULL DEFAULT 1,
-  max_capacity INT NOT NULL DEFAULT 6,
-  room_id UUID,
+  tags TEXT[] NOT NULL DEFAULT '{}',
+  filter_years INT[] NOT NULL DEFAULT '{}',
+  filter_departments TEXT[] NOT NULL DEFAULT '{}',
+  filter_genders gender_enum[] NOT NULL DEFAULT '{}',
+  resume_required BOOLEAN NOT NULL DEFAULT FALSE,
   closed_at TIMESTAMPTZ,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
@@ -122,6 +122,7 @@ CREATE TABLE applications (
   applicant_id UUID NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
   status application_status_enum NOT NULL DEFAULT 'applied',
   note TEXT,
+  expires_at TIMESTAMPTZ,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   UNIQUE(request_id, applicant_id)
@@ -263,11 +264,11 @@ CREATE TABLE meetings (
 CREATE TABLE room_files (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   room_id UUID NOT NULL REFERENCES rooms(id) ON DELETE CASCADE,
-  uploader_id UUID NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
+  uploaded_by UUID NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
   storage_path TEXT NOT NULL,
   file_name TEXT NOT NULL,
   file_size_bytes INT NOT NULL,
-  mime_type TEXT NOT NULL,
+  file_type TEXT NOT NULL,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
@@ -494,9 +495,26 @@ CREATE POLICY tasks_select_members ON tasks FOR SELECT USING (is_room_member(roo
 CREATE POLICY tasks_insert_members ON tasks FOR INSERT WITH CHECK (is_room_member(room_id, auth.uid()));
 CREATE POLICY tasks_update_members ON tasks FOR UPDATE USING (is_room_member(room_id, auth.uid()));
 
+-- Meetings
+CREATE POLICY meetings_select_room_members ON meetings FOR SELECT USING (is_room_member(room_id, auth.uid()));
+CREATE POLICY meetings_insert_room_members ON meetings FOR INSERT WITH CHECK (is_room_member(room_id, auth.uid()) AND created_by = auth.uid());
+CREATE POLICY meetings_delete_creator_or_lead ON meetings FOR DELETE USING (
+  is_room_member(room_id, auth.uid())
+  AND (
+    created_by = auth.uid()
+    OR EXISTS (
+      SELECT 1 FROM room_members rm
+      WHERE rm.room_id = meetings.room_id
+        AND rm.user_id = auth.uid()
+        AND rm.role = 'lead'
+        AND rm.status = 'active'
+    )
+  )
+);
+
 -- Room Files
 CREATE POLICY room_files_select_members ON room_files FOR SELECT USING (is_room_member(room_id, auth.uid()) OR is_active_mentor(room_id, auth.uid()));
-CREATE POLICY room_files_insert_members ON room_files FOR INSERT WITH CHECK (is_room_member(room_id, auth.uid()) AND uploader_id = auth.uid());
+CREATE POLICY room_files_insert_members ON room_files FOR INSERT WITH CHECK (is_room_member(room_id, auth.uid()) AND uploaded_by = auth.uid());
 
 -- Notifications
 CREATE POLICY notifications_select_own ON notifications FOR SELECT USING (user_id = auth.uid());

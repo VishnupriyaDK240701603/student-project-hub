@@ -7,13 +7,12 @@
  * Provides offline fallback page when disconnected.
  */
 
-const STATIC_CACHE_NAME = "sph-static-v1";
+const STATIC_CACHE_NAME = "sph-static-v2";
 const OFFLINE_URL = "/offline";
 
 const PRECACHE_ASSETS = [
   OFFLINE_URL,
   "/manifest.json",
-  "/favicon.ico",
   "/icons/icon-192.png",
   "/icons/icon-512.png",
 ];

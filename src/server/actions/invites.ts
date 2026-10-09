@@ -9,6 +9,8 @@ import {
   validateReplacementReason,
 } from "@/lib/invites-validation";
 import type { Application, TeamRequest, Notification } from "@/types/database.types";
+import { ensureRoomForRequest } from "@/server/actions/rooms";
+import { sendSelectionNotificationPipeline } from "@/server/actions/notifications";
 
 export interface ActionResult<T> {
   success: boolean;
@@ -80,10 +82,20 @@ export async function selectApplicant(
     return { success: false, error: "Cannot select a withdrawn application." };
   }
 
+  const { data: applicantProfile, error: applicantProfileError } = await supabase
+    .from("profiles")
+    .select("email, display_name")
+    .eq("id", application.applicant_id)
+    .single();
+
+  if (applicantProfileError || !applicantProfile) {
+    return { success: false, error: "Could not find the applicant's email address." };
+  }
+
   const expiresAt = calculateExpiresAt(expiryHours);
 
   // Update application to 'selected'
-  const { error: updateError } = await supabase
+  let { error: updateError } = await supabase
     .from("applications")
     .update({
       status: "selected",
@@ -92,17 +104,32 @@ export async function selectApplicant(
     })
     .eq("id", applicationId);
 
+  if (updateError && updateError.message?.includes("expires_at")) {
+    // Graceful fallback if expires_at column is missing from remote database schema
+    const fallbackRes = await supabase
+      .from("applications")
+      .update({
+        status: "selected",
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", applicationId);
+
+    updateError = fallbackRes.error;
+  }
+
   if (updateError) {
     return { success: false, error: updateError.message };
   }
 
-  // Create notification for applicant
-  await supabase.from("notifications").insert({
-    user_id: application.applicant_id,
-    type: "selection_invite",
-    title: "Team Invite Received!",
-    body: `You have been selected to join "${request.title}" as ${request.role_needed}. Please respond within ${expiryHours} hours.`,
-    link: "/inbox",
+  // Notify the selected applicant in the inbox, by email, and through web push.
+  await sendSelectionNotificationPipeline({
+    applicationId,
+    applicantId: application.applicant_id,
+    applicantEmail: applicantProfile.email,
+    applicantName: applicantProfile.display_name,
+    projectTitle: request.title,
+    roleNeeded: request.role_needed,
+    expiryHours,
   });
 
   // Write audit log entry
@@ -310,6 +337,22 @@ export async function acceptInviteAction(
       .from("applications")
       .update({ status: "accepted", updated_at: new Date().toISOString() })
       .eq("id", applicationId);
+
+    // If accepted count reached headcount, close request and ensure room creation
+    const { count: newAcceptedCount } = await supabase
+      .from("applications")
+      .select("id", { count: "exact", head: true })
+      .eq("request_id", request.id)
+      .eq("status", "accepted");
+
+    if ((newAcceptedCount ?? 0) >= request.headcount) {
+      await supabase
+        .from("team_requests")
+        .update({ status: "full", closed_at: new Date().toISOString() })
+        .eq("id", request.id);
+
+      await ensureRoomForRequest(request.id, request.lead_id, request.title);
+    }
   } else if (!rpcResult?.success) {
     return {
       success: false,

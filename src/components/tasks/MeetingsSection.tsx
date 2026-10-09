@@ -199,7 +199,7 @@ export const MeetingsSection: React.FC<MeetingsSectionProps> = ({
               type="datetime-local"
               value={scheduledAt}
               onChange={(e) => setScheduledAt(e.target.value)}
-              className="w-full bg-muted/70 border border-border rounded-lg px-3 py-2 text-sm text-foreground focus:ring-1 focus:ring-accent focus:outline-none"
+              className="w-full bg-background border border-border rounded-lg px-3 py-2 text-sm text-foreground focus:ring-2 focus:ring-accent focus:outline-none [color-scheme:light] dark:[color-scheme:dark]"
               required
             />
           </div>

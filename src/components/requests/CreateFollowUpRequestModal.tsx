@@ -91,8 +91,8 @@ export const CreateFollowUpRequestModal: React.FC<CreateFollowUpRequestModalProp
     if (res.success) {
       showToast({
         type: "success",
-        title: "Follow-up Request Published!",
-        description: "Candidates accepted from this request will join your existing room automatically.",
+        title: "Project Request Reopened",
+        description: "The existing project card is updated. Accepted applicants will join your current room.",
       });
       onSuccess();
       onClose();
@@ -109,14 +109,14 @@ export const CreateFollowUpRequestModal: React.FC<CreateFollowUpRequestModalProp
     <Dialog
       isOpen={isOpen}
       onClose={onClose}
-      title="Create Follow-up Team Request"
-      description={`Add additional roles for "${projectTitle}". Confirmed members join your active room automatically.`}
+      title="Follow Up on This Project"
+      description={`Update the existing project card for "${projectTitle}". Accepted applicants join your current team room.`}
     >
       <div className="space-y-4 pt-2">
         <div className="p-3 bg-indigo-50/70 dark:bg-indigo-950/30 border border-indigo-200 dark:border-indigo-900/60 rounded-xl text-xs text-indigo-700 dark:text-indigo-300">
-          <p className="font-semibold">Linked Project Room:</p>
+          <p className="font-semibold">Existing project card:</p>
           <p className="mt-0.5">
-            This request links to your existing team room. Existing room members will be notified when new members join.
+            This reopens the closed request on the same card. No duplicate project request will be created.
           </p>
         </div>
 
@@ -199,7 +199,7 @@ export const CreateFollowUpRequestModal: React.FC<CreateFollowUpRequestModalProp
             Cancel
           </Button>
           <Button variant="primary" size="sm" onClick={handleSubmit} isLoading={submitting}>
-            Publish Follow-up Request
+            Reopen Project Request
           </Button>
         </div>
       </div>

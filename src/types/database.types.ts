@@ -80,8 +80,11 @@ export interface Application {
 export interface ApplicationFile {
   id: string;
   application_id: string;
+  uploader_id?: string;
   storage_path: string;
+  file_name?: string;
   file_type: string;
+  mime_type?: string;
   file_size_bytes: number;
   delete_after: string | null;
   created_at: string;
@@ -89,8 +92,9 @@ export interface ApplicationFile {
 
 export interface Room {
   id: string;
-  request_id: string;
+  initial_request_id: string | null;
   lead_id: string;
+  name: string;
   created_at: string;
   updated_at: string;
 }
@@ -211,19 +215,6 @@ export interface RoomFile {
   created_at: string;
 }
 
-export interface Task {
-  id: string;
-  room_id: string;
-  parent_id: string | null;
-  title: string;
-  description: string | null;
-  status: TaskStatusEnum;
-  due_date: string | null;
-  created_by: string;
-  created_at: string;
-  updated_at: string;
-}
-
 export interface TaskAssignee {
   id: string;
   task_id: string;
@@ -302,6 +293,4 @@ export interface Appeal {
   status: ReportStatusEnum;
   created_at: string;
 }
-
-
 

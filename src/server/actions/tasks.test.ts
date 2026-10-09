@@ -12,6 +12,7 @@ vi.mock("@/lib/supabase/server", () => ({
     auth: { getUser: mockGetUser },
     from: mockFrom,
   })),
+  createAdminSupabaseClient: vi.fn(() => null),
 }));
 
 interface MockChain {

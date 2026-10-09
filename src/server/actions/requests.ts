@@ -9,7 +9,7 @@ import {
   type RequestFeedFilter,
   type ActionResult,
 } from "@/lib/requests-validation";
-import type { TeamRequest } from "@/types/database.types";
+import type { TeamRequest, GenderEnum } from "@/types/database.types";
 
 export type { CreateRequestInput, RequestFeedFilter, ActionResult };
 
@@ -30,11 +30,37 @@ export async function createTeamRequest(
   }
 
   // Check user kind: staff cannot create student project requests
-  const { data: profile } = await supabase
+  let { data: profile } = await supabase
     .from("profiles")
-    .select("kind, is_blocked, is_deactivated")
+    .select("kind, department, is_blocked, is_deactivated")
     .eq("id", user.id)
-    .single();
+    .maybeSingle();
+
+  if (!profile) {
+    // Auto-provision profile as student for logged-in user
+    const email = user.email || "";
+    const emailPrefix = email.split("@")[0] || "User";
+    const displayName = user.user_metadata?.full_name || emailPrefix;
+
+    const { data: newProf } = await supabase
+      .from("profiles")
+      .upsert({
+        id: user.id,
+        email,
+        display_name: displayName,
+        kind: "student",
+        admission_year: 2023,
+        department: "CSE",
+        gender: "prefer_not_to_say",
+        consent_version: "v1.0",
+      })
+      .select("kind, department, is_blocked, is_deactivated")
+      .maybeSingle();
+
+    if (newProf) {
+      profile = newProf;
+    }
+  }
 
   if (!profile || profile.kind !== "student") {
     return { success: false, error: "Only students can create team requests." };
@@ -77,6 +103,7 @@ export async function createTeamRequest(
       description: validation.sanitized.description,
       role_needed: validation.sanitized.role_needed,
       headcount: validation.sanitized.headcount,
+      department: profile.department || "CSE",
       tags: validation.sanitized.tags,
       filter_years: validation.sanitized.filter_years,
       filter_departments: validation.sanitized.filter_departments,
@@ -111,21 +138,6 @@ export async function getTeamRequestsFeed(
     return { success: false, error: "Unauthorized: Please sign in." };
   }
 
-  // Check user kind
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("kind")
-    .eq("id", user.id)
-    .single();
-
-  // Invariant: Staff accounts CANNOT browse the requests feed
-  if (profile?.kind === "staff") {
-    return {
-      success: true,
-      data: { requests: [], total: 0 },
-    };
-  }
-
   const page = filters.page || 1;
   const limit = filters.limit || 12;
   const offset = (page - 1) * limit;
@@ -136,6 +148,7 @@ export async function getTeamRequestsFeed(
       count: "exact",
     })
     .eq("status", "open")
+    .neq("lead_id", user.id)
     .order("created_at", { ascending: false })
     .range(offset, offset + limit - 1);
 
@@ -144,17 +157,81 @@ export async function getTeamRequestsFeed(
     query = query.ilike("title", term);
   }
 
-  const { data, count, error } = await query;
+  // Fetch user profile (kind, department, admission_year, gender) and main feed query in parallel
+  const [profileRes, feedRes] = await Promise.all([
+    supabase
+      .from("profiles")
+      .select("kind, department, admission_year, gender")
+      .eq("id", user.id)
+      .maybeSingle(),
+    query,
+  ]);
 
-  if (error) {
-    return { success: false, error: error.message };
+  const userProfile = profileRes.data;
+
+  // Invariant: Staff accounts CANNOT browse the requests feed
+  if (userProfile?.kind === "staff") {
+    return {
+      success: true,
+      data: { requests: [], total: 0 },
+    };
   }
+
+  if (feedRes.error) {
+    return { success: false, error: feedRes.error.message };
+  }
+
+  const rawRequests = (feedRes.data || []) as unknown as TeamRequest[];
+  const userDept = userProfile?.department ? userProfile.department.toLowerCase() : null;
+  const userYear = userProfile?.admission_year ?? null;
+  const userGender = userProfile?.gender ?? null;
+
+  // Filter requests so students ONLY see requests for which their department/year/gender is eligible
+  const eligibleRequests = rawRequests.filter((req) => {
+    // 1. Department eligibility: if request specifies filter_departments, student's department MUST be listed
+    if (userDept && req.filter_departments && req.filter_departments.length > 0) {
+      const allowedDepts = req.filter_departments.map((d) => d.toLowerCase());
+      if (!allowedDepts.includes(userDept)) {
+        return false;
+      }
+    }
+
+    // 2. Year eligibility: if request specifies filter_years, student's admission year MUST be listed
+    if (userYear !== null && req.filter_years && req.filter_years.length > 0) {
+      if (!req.filter_years.includes(userYear)) {
+        return false;
+      }
+    }
+
+    // 3. Gender eligibility: if request specifies filter_genders, student's gender MUST match
+    if (userGender && req.filter_genders && req.filter_genders.length > 0) {
+      if (userGender === "other" || userGender === "prefer_not_to_say") {
+        return false;
+      }
+      if (!req.filter_genders.includes(userGender as GenderEnum)) {
+        return false;
+      }
+    }
+
+    // 4. UI Dropdown Department Filter (if explicit department filter is selected)
+    if (filters.department && filters.department !== "all") {
+      const selectedDept = filters.department.toLowerCase();
+      const leadProfileDept = ((req as unknown as { profiles?: { department?: string } }).profiles?.department || "").toLowerCase();
+      const reqFilterDepts = (req.filter_departments || []).map((d) => d.toLowerCase());
+      const matches = leadProfileDept === selectedDept || reqFilterDepts.includes(selectedDept);
+      if (!matches) {
+        return false;
+      }
+    }
+
+    return true;
+  });
 
   return {
     success: true,
     data: {
-      requests: (data || []) as unknown as TeamRequest[],
-      total: count || 0,
+      requests: eligibleRequests,
+      total: eligibleRequests.length,
     },
   };
 }
@@ -172,47 +249,49 @@ export async function getMyTeamRequests(): Promise<ActionResult<TeamRequest[]>> 
     return { success: false, error: "Unauthorized" };
   }
 
-  const { data, error } = await supabase
-    .from("team_requests")
-    .select("*")
-    .eq("lead_id", user.id)
-    .order("created_at", { ascending: false });
+  const [requestsRes, roomsRes] = await Promise.all([
+    supabase
+      .from("team_requests")
+      .select("*")
+      .eq("lead_id", user.id)
+      .order("created_at", { ascending: false }),
+    supabase
+      .from("rooms")
+      .select("id, initial_request_id")
+      .eq("lead_id", user.id),
+  ]);
 
-  if (error) {
-    return { success: false, error: error.message };
+  if (requestsRes.error) {
+    return { success: false, error: requestsRes.error.message };
   }
 
-  return { success: true, data: (data || []) as TeamRequest[] };
+  const originalRequestByRoom = new Map(
+    (roomsRes.data || []).map((room) => [room.id, room.initial_request_id] as const),
+  );
+  const requests = (requestsRes.data || []).filter((request) =>
+    !request.room_id || originalRequestByRoom.get(request.room_id) === request.id,
+  );
+
+  return { success: true, data: requests as TeamRequest[] };
 }
 
+import { closeRequestAction, finalizeTeamAction } from "./rooms";
+
 /**
- * Manually close a request
+ * Manually close and finalize a team request to create project room
  */
+export async function finalizeTeamRequest(
+  requestId: string,
+): Promise<ActionResult<{ closed: boolean; roomId?: string }>> {
+  return finalizeTeamAction(requestId);
+}
+
 export async function closeTeamRequest(
   requestId: string,
 ): Promise<ActionResult<{ closed: boolean }>> {
-  const supabase = await createServerSupabaseClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) {
-    return { success: false, error: "Unauthorized" };
+  const res = await closeRequestAction(requestId);
+  if (!res.success) {
+    return { success: false, error: res.error };
   }
-
-  const { error } = await supabase
-    .from("team_requests")
-    .update({
-      status: "closed",
-      closed_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-    })
-    .eq("id", requestId)
-    .eq("lead_id", user.id);
-
-  if (error) {
-    return { success: false, error: error.message };
-  }
-
   return { success: true, data: { closed: true } };
 }

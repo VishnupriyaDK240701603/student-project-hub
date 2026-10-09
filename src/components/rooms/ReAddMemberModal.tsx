@@ -75,9 +75,9 @@ export const ReAddMemberModal: React.FC<ReAddMemberModalProps> = ({
   return (
     <Dialog isOpen={isOpen} onClose={onClose} title="Re-add Past Team Member">
       <div className="space-y-4">
-        <div className="rounded-lg bg-emerald-500/10 border border-emerald-500/20 p-3 text-sm text-emerald-800 dark:text-emerald-200">
-          <p className="font-medium">Strict Re-add Invariant (Requirement 5)</p>
-          <p className="mt-1 text-xs text-muted-foreground">
+        <div className="rounded-xl bg-accent/10 border border-accent/20 p-3.5 text-sm">
+          <p className="font-bold text-foreground">Strict Re-add Invariant (Requirement 5)</p>
+          <p className="mt-1 text-xs text-muted-foreground leading-relaxed">
             You can re-add only people who previously accepted an invitation to this project room. Blocked users are never eligible.
           </p>
         </div>
@@ -103,10 +103,10 @@ export const ReAddMemberModal: React.FC<ReAddMemberModalProps> = ({
                 <div className="flex items-center gap-3 min-w-0">
                   <Avatar name={c.display_name} size="sm" />
                   <div className="min-w-0">
-                    <p className="text-sm font-medium truncate">{c.display_name}</p>
+                    <p className="text-sm font-semibold text-foreground truncate">{c.display_name}</p>
                     <p className="text-xs text-muted-foreground">{c.department}</p>
                     {c.status === "removed" && c.removed_reason && (
-                      <p className="text-xs text-amber-600 dark:text-amber-400 truncate mt-0.5" title={c.removed_reason}>
+                      <p className="text-xs text-amber-700 dark:text-amber-300 font-medium truncate mt-0.5" title={c.removed_reason}>
                         Past removal reason: {c.removed_reason}
                       </p>
                     )}

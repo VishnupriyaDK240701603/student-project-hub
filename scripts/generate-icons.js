@@ -5,7 +5,7 @@ const zlib = require("zlib");
 // Helper to create a solid color PNG buffer
 function createSolidPng(width, height, r, g, b, a = 255) {
   // Signature
-  const signature = Buffer.from([138, 80, 78, 71, 13, 10, 26, 10]);
+  const signature = Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]);
 
   // IHDR chunk
   const ihdrData = Buffer.alloc(13);
@@ -83,11 +83,11 @@ if (!fs.existsSync(iconsDir)) {
   fs.mkdirSync(iconsDir, { recursive: true });
 }
 
-// Generate indigo (#4f46e5) icons
-const icon192 = createSolidPng(192, 192, 79, 70, 229);
+// Generate forest green (#0a2215) icons
+const icon192 = createSolidPng(192, 192, 10, 34, 21);
 fs.writeFileSync(path.join(iconsDir, "icon-192.png"), icon192);
 
-const icon512 = createSolidPng(512, 512, 79, 70, 229);
+const icon512 = createSolidPng(512, 512, 10, 34, 21);
 fs.writeFileSync(path.join(iconsDir, "icon-512.png"), icon512);
 
 console.log("PWA icons generated successfully in public/icons/");

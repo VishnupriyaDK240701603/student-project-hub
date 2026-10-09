@@ -111,7 +111,7 @@ test.describe("Design System & PWA Shell (/design)", () => {
       const ariaLabel = await button.getAttribute("aria-label");
       const text = await button.textContent();
       const hasAccessibleName = Boolean(ariaLabel?.trim() || text?.trim());
-      expect(hasAccessibleName).toBe(true);
+      expect(hasAccessibleName, await button.evaluate((element) => element.outerHTML)).toBe(true);
     }
 
     // Verify main landmark exists

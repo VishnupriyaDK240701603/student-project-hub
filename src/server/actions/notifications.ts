@@ -139,28 +139,32 @@ export async function getTypedInboxItemsAction(): Promise<ActionResult<TypedInbo
     return { success: false, error: "Unauthorized" };
   }
 
-  // 1. Fetch pending invites
-  const { data: invites } = await supabase
-    .from("applications")
-    .select("*, team_requests(*)")
-    .eq("applicant_id", user.id)
-    .eq("status", "selected")
-    .order("created_at", { ascending: false });
+  // Fetch pending invites, outcomes, and activity notifications in parallel
+  const [invitesRes, outcomesRes, notifsRes] = await Promise.all([
+    supabase
+      .from("applications")
+      .select("*, team_requests(*)")
+      .eq("applicant_id", user.id)
+      .eq("status", "selected")
+      .order("created_at", { ascending: false }),
+    supabase
+      .from("applications")
+      .select(
+        "*, team_requests(id, title, role_needed, status, lead_id, profiles:lead_id(display_name, department))",
+      )
+      .eq("applicant_id", user.id)
+      .order("updated_at", { ascending: false }),
+    supabase
+      .from("notifications")
+      .select("*")
+      .eq("user_id", user.id)
+      .order("created_at", { ascending: false })
+      .limit(60),
+  ]);
 
-  // 2. Fetch all user applications (for outcomes tab)
-  const { data: outcomes } = await supabase
-    .from("applications")
-    .select("*, team_requests(id, title, role_needed, status, lead_id, profiles:lead_id(display_name, department))")
-    .eq("applicant_id", user.id)
-    .order("updated_at", { ascending: false });
-
-  // 3. Fetch notifications
-  const { data: notifs } = await supabase
-    .from("notifications")
-    .select("*")
-    .eq("user_id", user.id)
-    .order("created_at", { ascending: false })
-    .limit(60);
+  const invites = invitesRes.data;
+  const outcomes = outcomesRes.data;
+  const notifs = notifsRes.data;
 
   const notificationsList = (notifs || []) as Notification[];
   const unreadNotifs = notificationsList.filter((n) => !n.is_read).length;

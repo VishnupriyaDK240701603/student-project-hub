@@ -228,12 +228,12 @@ export const TaskModal: React.FC<TaskModalProps> = ({
                       handleStatusOnlyChange(newStatus);
                     }
                   }}
-                  className="bg-muted/70 border border-border rounded-lg px-3 py-1.5 text-sm font-medium text-foreground focus:ring-1 focus:ring-accent focus:outline-none"
+                  className="bg-background border border-border rounded-lg px-3 py-1.5 text-sm font-semibold text-foreground focus:ring-2 focus:ring-accent focus:outline-none"
                   aria-label="Task status"
                 >
-                  <option value="todo">To do</option>
-                  <option value="in_progress">In progress</option>
-                  <option value="done">Done</option>
+                  <option value="todo" className="bg-card text-foreground">To do</option>
+                  <option value="in_progress" className="bg-card text-foreground">In progress</option>
+                  <option value="done" className="bg-card text-foreground">Done</option>
                 </select>
               ) : (
                 <Badge variant={status === "done" ? "success" : "neutral"}>
@@ -252,11 +252,11 @@ export const TaskModal: React.FC<TaskModalProps> = ({
                   type="date"
                   value={dueDate}
                   onChange={(e) => setDueDate(e.target.value)}
-                  className="bg-muted/70 border border-border rounded-lg px-3 py-1.5 text-sm font-medium text-foreground focus:ring-1 focus:ring-accent focus:outline-none"
+                  className="bg-background border border-border rounded-lg px-3 py-1.5 text-sm font-semibold text-foreground focus:ring-2 focus:ring-accent focus:outline-none [color-scheme:light] dark:[color-scheme:dark]"
                   aria-label="Due date"
                 />
               ) : (
-                <span className="text-sm text-foreground">
+                <span className="text-sm font-medium text-foreground">
                   {task.due_date ? new Date(task.due_date).toLocaleDateString() : "No deadline"}
                 </span>
               )}
@@ -277,7 +277,7 @@ export const TaskModal: React.FC<TaskModalProps> = ({
               rows={3}
             />
           ) : (
-            <p className="text-sm text-foreground bg-muted/30 p-3 rounded-lg border border-border/40">
+            <p className="text-sm text-foreground bg-muted/40 p-3 rounded-lg border border-border">
               {task.description || "No description provided."}
             </p>
           )}
@@ -289,7 +289,7 @@ export const TaskModal: React.FC<TaskModalProps> = ({
             Assignees
           </label>
           {canEdit ? (
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-36 overflow-y-auto p-1 border rounded-lg bg-muted/20">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-36 overflow-y-auto p-1.5 border border-border rounded-lg bg-muted/30">
               {members
                 .filter((m) => m.status === "active")
                 .map((member) => {
@@ -301,8 +301,8 @@ export const TaskModal: React.FC<TaskModalProps> = ({
                       onClick={() => toggleAssignee(member.user_id)}
                       className={`flex items-center gap-2 p-2 rounded-md text-left text-xs transition-colors ${
                         isSelected
-                          ? "bg-accent/15 text-accent font-medium border border-accent/30"
-                          : "hover:bg-muted/60 text-muted-foreground"
+                          ? "bg-accent/15 text-accent font-semibold border border-accent/30"
+                          : "hover:bg-muted text-foreground"
                       }`}
                     >
                       <input

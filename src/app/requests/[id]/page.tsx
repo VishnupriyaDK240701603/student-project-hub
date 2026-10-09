@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState, use, useCallback } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { AppShell } from "@/components/layout/AppShell";
 import {
   Badge,
@@ -21,7 +22,9 @@ import { SelectApplicantModal } from "@/components/invites/SelectApplicantModal"
 import { RaiseHeadcountModal } from "@/components/invites/RaiseHeadcountModal";
 import { ReplaceMemberModal } from "@/components/invites/ReplaceMemberModal";
 import { CreateFollowUpRequestModal } from "@/components/requests/CreateFollowUpRequestModal";
+import { DeleteProjectConfirmation } from "@/components/rooms/DeleteProjectConfirmation";
 import { CountdownBadge } from "@/components/invites/CountdownBadge";
+import { ResumePreviewModal } from "@/components/applications/ResumePreviewModal";
 import { createClient } from "@/lib/supabase/client";
 import { admissionYearToStudyLevel, getStudyLevelLabel } from "@/lib/academic-year";
 import {
@@ -36,7 +39,7 @@ import {
   acceptInviteAction,
   declineInviteAction,
 } from "@/server/actions/invites";
-import { closeRequestAction } from "@/server/actions/rooms";
+import { closeRequestAction, deleteTeamRequestAction } from "@/server/actions/rooms";
 import { collegeConfig } from "../../../../college.config";
 import type { TeamRequest, Application, ApplicationFile } from "@/types/database.types";
 
@@ -46,6 +49,7 @@ interface PageProps {
 
 export default function RequestDetailsPage({ params }: PageProps) {
   const { showToast } = useToast();
+  const router = useRouter();
   const resolvedParams = use(params);
   const requestId = resolvedParams.id;
 
@@ -75,15 +79,26 @@ export default function RequestDetailsPage({ params }: PageProps) {
   const [isRaiseHeadcountOpen, setIsRaiseHeadcountOpen] = useState(false);
   const [isFollowUpOpen, setIsFollowUpOpen] = useState(false);
   const [isClosing, setIsClosing] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
   const [activeRoomId, setActiveRoomId] = useState<string | null>(null);
+  const [isOriginalProjectRequest, setIsOriginalProjectRequest] = useState(true);
   const [activeRoomMembers, setActiveRoomMembers] = useState<
     Array<{ id: string; user_id: string; role: string; profiles?: { display_name: string; department: string } }>
   >([]);
   const [memberToReplace, setMemberToReplace] = useState<ApplicationWithDetails | null>(null);
   const [leadTab, setLeadTab] = useState<"applied" | "selected" | "waitlisted" | "accepted" | "all">("applied");
+  const [previewResumeModal, setPreviewResumeModal] = useState<{
+    fileId: string;
+    fileName?: string;
+    candidateName: string;
+    candidateDepartment?: string;
+    candidateYear?: string;
+    candidateNote?: string | null;
+  } | null>(null);
 
   const fetchRequestDetails = useCallback(async () => {
     setLoading(true);
+    setIsOriginalProjectRequest(true);
     const supabase = createClient();
 
     const {
@@ -122,10 +137,22 @@ export default function RequestDetailsPage({ params }: PageProps) {
     if (!targetRoomId && (data.status === "full" || data.status === "closed")) {
       const { data: rm } = await supabase
         .from("rooms")
-        .select("id")
-        .eq("request_id", requestId)
+        .select("id, initial_request_id")
+        .eq("initial_request_id", requestId)
         .maybeSingle();
-      if (rm) targetRoomId = rm.id;
+      if (rm) {
+        targetRoomId = rm.id;
+        setIsOriginalProjectRequest(true);
+      }
+    } else if (targetRoomId) {
+      const { data: room } = await supabase
+        .from("rooms")
+        .select("initial_request_id")
+        .eq("id", targetRoomId)
+        .maybeSingle();
+      setIsOriginalProjectRequest(!room?.initial_request_id || room.initial_request_id === requestId);
+    } else {
+      setIsOriginalProjectRequest(true);
     }
     setActiveRoomId(targetRoomId);
 
@@ -284,7 +311,7 @@ export default function RequestDetailsPage({ params }: PageProps) {
     }
   };
 
-  const handleCloseEarly = async () => {
+  const handleFinalizeTeam = async () => {
     if (!request) return;
     setIsClosing(true);
     const res = await closeRequestAction(request.id);
@@ -293,23 +320,42 @@ export default function RequestDetailsPage({ params }: PageProps) {
     if (res.success) {
       showToast({
         type: "success",
-        title: "Request Closed Early",
-        description: "The team request has been closed and your project room is active!",
+        title: "Team Finalized & Room Created",
+        description: "Your team is now finalized and your dedicated project room is active!",
       });
       fetchRequestDetails();
     } else {
       showToast({
         type: "error",
-        title: "Failed to Close Request",
-        description: res.error || "Could not close request.",
+        title: "Failed to Finalize Team",
+        description: res.error || "Could not finalize team and create room.",
       });
     }
   };
 
-  const handleDownloadFile = async (fileId: string) => {
-    const res = await getSecureFileDownloadUrl(fileId);
+  const handleDeleteRequest = async () => {
+    if (!request) return;
+    setIsDeleting(true);
+    const result = await deleteTeamRequestAction(request.id);
+    setIsDeleting(false);
+    if (result.success) {
+      showToast({ type: "success", title: "Team request deleted", description: "The request and its linked project data have been permanently removed." });
+      router.push("/requests");
+    } else {
+      showToast({ type: "error", title: "Could not delete request", description: result.error || "Please try again." });
+    }
+  };
+
+  const handleDownloadFile = async (fileId: string, customFileName?: string) => {
+    const res = await getSecureFileDownloadUrl(fileId, true);
     if (res.success && res.data?.downloadUrl) {
-      window.open(res.data.downloadUrl, "_blank");
+      const a = document.createElement("a");
+      a.href = res.data.downloadUrl;
+      a.download = res.data.fileName || customFileName || "resume.pdf";
+      a.target = "_blank";
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
     } else {
       showToast({
         type: "error",
@@ -632,17 +678,37 @@ export default function RequestDetailsPage({ params }: PageProps) {
                           )}
                           {myApplication.application_files &&
                             myApplication.application_files.length > 0 && (
-                              <div className="mt-1 flex items-center gap-2">
-                                <span className="text-xs text-slate-500">Attachment:</span>
-                                <button
-                                  type="button"
+                              <div className="mt-2 flex items-center gap-2 flex-wrap">
+                                <span className="text-xs text-slate-500 font-medium">Your Attachment:</span>
+                                <Button
+                                  variant="outline"
+                                  size="sm"
                                   onClick={() =>
-                                    handleDownloadFile(myApplication.application_files![0].id)
+                                    setPreviewResumeModal({
+                                      fileId: myApplication.application_files![0].id,
+                                      fileName: myApplication.application_files![0].file_name || undefined,
+                                      candidateName: "My Resume",
+                                      candidateDepartment: getDeptName(leadProfile?.department || ""),
+                                      candidateNote: myApplication.note,
+                                    })
                                   }
-                                  className="text-xs font-semibold text-indigo-600 dark:text-indigo-400 hover:underline"
+                                  className="text-xs py-0.5 px-2.5 h-7 gap-1 text-indigo-600 dark:text-indigo-400 border-indigo-200 dark:border-indigo-800"
                                 >
-                                  Download Resume
-                                </button>
+                                  👁️ Preview Resume
+                                </Button>
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() =>
+                                    handleDownloadFile(
+                                      myApplication.application_files![0].id,
+                                      myApplication.application_files![0].file_name || "my_resume.pdf"
+                                    )
+                                  }
+                                  className="text-xs py-0.5 px-2.5 h-7 gap-1"
+                                >
+                                  ⬇️ Download
+                                </Button>
                               </div>
                             )}
                         </div>
@@ -690,16 +756,16 @@ export default function RequestDetailsPage({ params }: PageProps) {
                     <div className="flex items-center gap-2 flex-wrap">
                       {request.status !== "closed" && (
                         <Button
-                          variant="outline"
+                          variant="primary"
                           size="sm"
-                          onClick={handleCloseEarly}
+                          onClick={handleFinalizeTeam}
                           isLoading={isClosing}
-                          className="text-xs text-amber-700 border-amber-300 hover:bg-amber-50 dark:border-amber-800 dark:hover:bg-amber-950/30"
+                          className="text-xs bg-emerald-600 hover:bg-emerald-700 text-white font-semibold shadow-sm"
                         >
-                          Close Request Early
+                          🎉 Finalize Team & Open Room
                         </Button>
                       )}
-                      {activeRoomId && (
+                      {activeRoomId && isOriginalProjectRequest && request.status === "closed" && (
                         <Button
                           variant="outline"
                           size="sm"
@@ -717,8 +783,19 @@ export default function RequestDetailsPage({ params }: PageProps) {
                       >
                         Adjust Headcount
                       </Button>
+                      <DeleteProjectConfirmation
+                        itemName={request.title}
+                        itemType="team request"
+                        isDeleting={isDeleting}
+                        onConfirm={handleDeleteRequest}
+                      />
                     </div>
                   </div>
+                  {!activeRoomId && request.status === "open" && (
+                    <p className="text-[11px] text-slate-500 italic">
+                      💡 Note: The collaboration room will be created once you finalize your team or spots are filled.
+                    </p>
+                  )}
 
                   {/* Console Tabs */}
                   <div className="flex items-center gap-1.5 p-1 bg-slate-100 dark:bg-slate-800 rounded-xl overflow-x-auto">
@@ -843,15 +920,59 @@ export default function RequestDetailsPage({ params }: PageProps) {
 
                             {/* Files */}
                             {app.application_files && app.application_files.length > 0 && (
-                              <div className="pl-11 flex items-center gap-2 pt-0.5">
+                              <div className="pl-11 flex items-center gap-2 pt-0.5 flex-wrap">
                                 <Button
                                   variant="outline"
                                   size="sm"
-                                  onClick={() => handleDownloadFile(app.application_files[0].id)}
-                                  className="text-xs py-1 px-2.5 h-auto gap-1"
+                                  onClick={() =>
+                                    setPreviewResumeModal({
+                                      fileId: app.application_files![0].id,
+                                      fileName: app.application_files![0].file_name || undefined,
+                                      candidateName: app.profiles?.display_name || "Applicant",
+                                      candidateDepartment: getDeptName(app.profiles?.department || ""),
+                                      candidateYear: app.profiles?.admission_year
+                                        ? getStudyLevelLabel(admissionYearToStudyLevel(app.profiles.admission_year))
+                                        : undefined,
+                                      candidateNote: app.note,
+                                    })
+                                  }
+                                  className="text-xs py-1 px-3 h-8 gap-1.5 font-medium text-indigo-600 dark:text-indigo-400 border-indigo-200 dark:border-indigo-800 hover:bg-indigo-50 dark:hover:bg-indigo-950/40"
                                 >
                                   <svg
-                                    className="h-3.5 w-3.5 text-indigo-600"
+                                    className="h-3.5 w-3.5"
+                                    fill="none"
+                                    viewBox="0 0 24 24"
+                                    stroke="currentColor"
+                                  >
+                                    <path
+                                      strokeLinecap="round"
+                                      strokeLinejoin="round"
+                                      strokeWidth={2}
+                                      d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
+                                    />
+                                    <path
+                                      strokeLinecap="round"
+                                      strokeLinejoin="round"
+                                      strokeWidth={2}
+                                      d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"
+                                    />
+                                  </svg>
+                                  Review Resume
+                                </Button>
+
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() =>
+                                    handleDownloadFile(
+                                      app.application_files![0].id,
+                                      app.application_files![0].file_name || `${app.profiles?.display_name || "candidate"}_resume.pdf`
+                                    )
+                                  }
+                                  className="text-xs py-1 px-2.5 h-8 gap-1 text-slate-600 dark:text-slate-300"
+                                >
+                                  <svg
+                                    className="h-3.5 w-3.5 text-slate-500"
                                     fill="none"
                                     viewBox="0 0 24 24"
                                     stroke="currentColor"
@@ -863,7 +984,7 @@ export default function RequestDetailsPage({ params }: PageProps) {
                                       d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"
                                     />
                                   </svg>
-                                  Download Resume ({(app.application_files[0].file_size_bytes / (1024 * 1024)).toFixed(1)} MB)
+                                  Download ({(app.application_files[0].file_size_bytes / (1024 * 1024)).toFixed(1)} MB)
                                 </Button>
                               </div>
                             )}
@@ -996,6 +1117,17 @@ export default function RequestDetailsPage({ params }: PageProps) {
                 onSuccess={fetchRequestDetails}
               />
             )}
+            {/* Resume Preview Modal */}
+            <ResumePreviewModal
+              isOpen={Boolean(previewResumeModal)}
+              onClose={() => setPreviewResumeModal(null)}
+              fileId={previewResumeModal?.fileId || null}
+              fileName={previewResumeModal?.fileName}
+              candidateName={previewResumeModal?.candidateName || "Candidate"}
+              candidateDepartment={previewResumeModal?.candidateDepartment}
+              candidateYear={previewResumeModal?.candidateYear}
+              candidateNote={previewResumeModal?.candidateNote}
+            />
           </div>
         )}
       </div>
