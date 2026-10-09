@@ -222,7 +222,7 @@ export function createDefaultProvider(): AiProvider {
   if (groqKey) {
     return new OpenAIChatProvider({
       token: groqKey,
-      model: process.env.GROQ_MODEL || "llama-3.1-8b-instant",
+      model: process.env.GROQ_MODEL || "openai/gpt-oss-120b",
       endpoint: "https://api.groq.com/openai/v1/chat/completions",
       providerName: "Groq",
     });
