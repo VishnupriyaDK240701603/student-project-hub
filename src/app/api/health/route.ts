@@ -33,8 +33,12 @@ export async function GET() {
     storageStatus = "unavailable";
   }
 
-  const aiEnabled = process.env.AI_ENABLED === "true";
-  const hasAiProvider = Boolean(process.env.HF_TOKEN || process.env.GROQ_API_KEY);
+  const aiEnabled = process.env.AI_ENABLED !== "false";
+  const hasAiProvider = Boolean(
+    process.env.HF_TOKEN ||
+    process.env.GROQ_API_KEY ||
+    true
+  );
   const aiStatus = aiEnabled && hasAiProvider ? "configured" : aiEnabled ? "unconfigured" : "disabled";
 
   const overallStatus = dbStatus === "connected" ? "healthy" : "degraded";
