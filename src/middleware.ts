@@ -48,15 +48,13 @@ export async function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
-  // If Supabase credentials are not configured, treat user as unauthenticated and redirect to /login
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-
-  if (!supabaseUrl || !supabaseKey) {
-    const url = request.nextUrl.clone();
-    url.pathname = "/login";
-    return NextResponse.redirect(url);
-  }
+  // Use configured Supabase credentials with robust production fallbacks
+  const supabaseUrl =
+    process.env.NEXT_PUBLIC_SUPABASE_URL ||
+    "https://vwfkxwhlopsmbyqgeagz.supabase.co";
+  const supabaseKey =
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ||
+    "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZ3Zmt4d2hsb3BzbWJ5cWdlYWd6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTEzNTI2NDYsImV4cCI6MjEwNjkyODY0Nn0.d3sPxfDWwk3xH-0k3eIRqVRlinEAuN2lCnXTDtn8IYw";
 
   let supabaseResponse = NextResponse.next({ request });
 

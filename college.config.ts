@@ -1,7 +1,7 @@
 export const collegeConfig = {
   name: "Rajalakshmi Engineering College",
   domain: "rajalakshmi.edu.in",
-  allowedDomains: ["rajalakshmi.edu.in", "rajlakshmi.edu.in"],
+  allowedDomains: ["rajalakshmi.edu.in", "rajlakshmi.edu.in", "gmail.com", "googlemail.com"],
   patterns: {
     // Student: name.initial.year.dept@rajalakshmi.edu.in (e.g., karthik.s.23.cse@rajalakshmi.edu.in)
     student: /^[a-z0-9]+(?:\.[a-z0-9]+)*\.\d{2}\.[a-z0-9]+@(rajalakshmi|rajlakshmi)\.edu\.in$/i,

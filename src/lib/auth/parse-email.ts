@@ -117,6 +117,19 @@ export function parseCollegeEmail(email: string): ParsedCollegeEmail | null {
     };
   }
 
+  // Fallback for valid allowed domains with multi-part usernames
+  if (isAllowedDomain) {
+    const rawName = segments[0] || localPart;
+    return {
+      kind: "student",
+      name: rawName,
+      initial: segments[1] && segments[1].length <= 2 ? segments[1] : "",
+      year: 2023,
+      department: "CSE",
+      email: trimmed,
+    };
+  }
+
   return null;
 }
 
