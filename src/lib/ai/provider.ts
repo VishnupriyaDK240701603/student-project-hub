@@ -47,68 +47,89 @@ export class OpenAIChatProvider implements AiProvider {
     }
 
     const timeoutMs = options.timeoutMs || 30_000;
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+    const candidateModels = [
+      this.model,
+      "openai/gpt-oss-120b",
+      "openai/gpt-oss-20b",
+    ].filter((m, idx, arr) => Boolean(m) && arr.indexOf(m) === idx);
 
-    try {
-      const response = await fetch(this.endpoint, {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${this.token}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          model: this.model,
-          messages: messages.map((m) => ({ role: m.role, content: m.content })),
-          temperature: options.temperature ?? 0.7,
-          max_tokens: options.maxTokens ?? 1024,
-          stream: false,
-        }),
-        signal: controller.signal,
-      });
+    for (let i = 0; i < candidateModels.length; i++) {
+      const activeModel = candidateModels[i];
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
 
-      clearTimeout(timeoutId);
+      try {
+        const response = await fetch(this.endpoint, {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${this.token}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            model: activeModel,
+            messages: messages.map((m) => ({ role: m.role, content: m.content })),
+            temperature: options.temperature ?? 0.7,
+            max_tokens: options.maxTokens ?? 1024,
+            stream: false,
+          }),
+          signal: controller.signal,
+        });
 
-      if (!response.ok) {
-        return this.handleErrorResponse(response);
-      }
+        clearTimeout(timeoutId);
 
-      const data = await response.json();
+        if (!response.ok) {
+          if (response.status === 404 && i < candidateModels.length - 1) {
+            console.warn(`[AI] Model ${activeModel} returned 404 on ${this.providerName}, trying fallback ${candidateModels[i + 1]}`);
+            continue;
+          }
+          return this.handleErrorResponse(response);
+        }
 
-      // OpenAI-compatible chat completion response: choices[0].message.content
-      const outputText: string =
-        (data?.choices?.[0]?.message?.content as string) ||
-        (data?.choices?.[0]?.text as string) ||
-        (data?.generated_text as string) ||
-        (Array.isArray(data) && (data[0]?.generated_text as string)) ||
-        "";
+        const data = await response.json();
 
-      if (!outputText) {
-        console.error(
-          `[AI] Unexpected ${this.providerName} response shape:`,
-          JSON.stringify(data).slice(0, 300),
-        );
+        // OpenAI-compatible chat completion response: choices[0].message.content
+        const outputText: string =
+          (data?.choices?.[0]?.message?.content as string) ||
+          (data?.choices?.[0]?.text as string) ||
+          (data?.generated_text as string) ||
+          (Array.isArray(data) && (data[0]?.generated_text as string)) ||
+          "";
+
+        if (!outputText) {
+          console.error(
+            `[AI] Unexpected ${this.providerName} response shape:`,
+            JSON.stringify(data).slice(0, 300),
+          );
+          return {
+            text: "",
+            error: "AI returned an empty response. Please try rephrasing your question.",
+          };
+        }
+
+        return { text: outputText.trim() };
+      } catch (err: unknown) {
+        clearTimeout(timeoutId);
+        if (err instanceof Error && err.name === "AbortError") {
+          return {
+            text: "",
+            error: "AI request timed out. Please try again with a shorter query.",
+          };
+        }
+        if (i < candidateModels.length - 1) {
+          continue;
+        }
+        console.error(`[AI] ${this.providerName} fetch error:`, err);
         return {
           text: "",
-          error: "AI returned an empty response. Please try rephrasing your question.",
+          error: "Unable to reach AI assistant. Please try again later.",
         };
       }
-
-      return { text: outputText.trim() };
-    } catch (err: unknown) {
-      clearTimeout(timeoutId);
-      if (err instanceof Error && err.name === "AbortError") {
-        return {
-          text: "",
-          error: "AI request timed out. Please try again with a shorter query.",
-        };
-      }
-      console.error(`[AI] ${this.providerName} fetch error:`, err);
-      return {
-        text: "",
-        error: "Unable to reach AI assistant. Please try again later.",
-      };
     }
+
+    return {
+      text: "",
+      error: "Unable to reach AI assistant with configured models.",
+    };
   }
 
   private async handleErrorResponse(
